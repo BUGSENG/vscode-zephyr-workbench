@@ -226,11 +226,7 @@ function setVSCodeMessageListener() {
         break;
       }
       case "report-server-started": {
-        const startBtn = document.getElementById('start-report-server') as any;
         const stopBtn = document.getElementById('stop-report-server') as any;
-        if (startBtn) {
-          startBtn.disabled = true;
-        }
         if (stopBtn) {
           stopBtn.disabled = false;
         }
