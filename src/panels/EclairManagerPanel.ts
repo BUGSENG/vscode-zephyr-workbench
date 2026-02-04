@@ -936,8 +936,12 @@ export class EclairManagerPanel {
       const p = (cfg.userRulesetPath || "").trim();
       if (name) parts.push(`-DECLAIR_USER_RULESET_NAME=\"${name}\"`);
       if (p) parts.push(`-DECLAIR_USER_RULESET_PATH=\"${p}\"`);
+      parts.push("-DECLAIR_RULESET_FIRST_ANALYSIS=OFF");
     } else if (cfg.ruleset) {
       parts.push(`-D${cfg.ruleset}=ON`);
+      if (cfg.ruleset !== "ECLAIR_RULESET_FIRST_ANALYSIS") {
+        parts.push("-DECLAIR_RULESET_FIRST_ANALYSIS=OFF");
+      }
     } else {
       parts.push("-DECLAIR_RULESET_FIRST_ANALYSIS=ON");
     }
