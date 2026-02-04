@@ -263,7 +263,7 @@ export class EclairManagerPanel {
     const activeIdx = configs.findIndex(c => c?.active === true || c?.active === "true");
     const idx = activeIdx >= 0 ? activeIdx : 0;
 
-    const buildDir = configs[idx]?.build?.dir || configs[idx]?.buildDir || path.join(appDir, "build");
+    const buildDir = this.getBuildDir(configs, idx, appDir);
     const ecdPath = path.join(buildDir, "sca", "eclair", "PROJECT.ecd");
 
     if (fs.existsSync(ecdPath)) {
@@ -747,11 +747,7 @@ export class EclairManagerPanel {
             break;
           }
 
-          const buildDir =
-            configs[idx]?.build?.dir ||
-            configs[idx]?.buildDir ||
-            path.join(appDir, "build", configs[idx]?.name || "primary");
-
+          const buildDir = this.getBuildDir(configs, idx, appDir);
           // Build CMake arguments
           const cmakeArgs = this.buildCmd(cfg);
 
@@ -888,6 +884,14 @@ export class EclairManagerPanel {
         }
       }
     }, undefined, this._disposables);
+  }
+
+  private getBuildDir(configs: any, idx: number, appDir: string): string {
+    return (
+      configs[idx]?.build?.dir ||
+        configs[idx]?.buildDir ||
+        path.join(appDir, "build", configs[idx]?.name || "primary")
+    );
   }
 
   private buildCmd(cfg: IEclairConfig): string {
