@@ -1,0 +1,83 @@
+
+
+// Commands sent FROM extension backend TO webview frontend
+export type ExtensionMessage = {
+  command: "toggle-spinner",
+  show: boolean,
+} | {
+  command: "eclair-status",
+  installed: boolean,
+  version: string,
+} | {
+  command: "set-install-path",
+  path: string,
+} | {
+  command: "set-extra-config",
+  path: string,
+} | {
+  command: "set-path-status",
+  text: string,
+} | {
+  command: "set-install-path-placeholder",
+} | {
+  command: "set-user-ruleset-name",
+  name: string,
+} | {
+  command: "set-user-ruleset-path",
+  path: string,
+} | {
+  command: "report-server-started",
+} | {
+  command: "report-server-stopped",
+};
+
+// Commands sent FROM webview frontend TO extension backend
+export type WebviewMessage = {
+  command: "refresh-status",
+} | {
+  command: "probe-eclair",
+} | {
+  command: "update-path",
+  tool: string,
+  newPath: string,
+} | {
+  command: "browse-path",
+  tool: string,
+} | {
+  command: "update-extra-config",
+  newPath: string,
+} | {
+  command: "browse-extra-config",
+} | {
+  command: "browse-user-ruleset-path",
+} | {
+  command: "save-sca-config",
+  data: {
+    installPath?: string,
+    extraConfig?: string,
+    ruleset?: string,
+    userRulesetName?: string,
+    userRulesetPath?: string,
+    reports?: string[],
+  },
+} | {
+  command: "run-command",
+  data: {
+    installPath?: string,
+    extraConfig?: string,
+    ruleset?: string,
+    userRulesetName?: string,
+    userRulesetPath?: string,
+    reports?: string[],
+  },
+} | {
+  command: "start-report-server",
+} | {
+  command: "stop-report-server",
+} | {
+  command: "about-eclair",
+} | {
+  command: "manage-license",
+} | {
+  command: "request-trial",
+};

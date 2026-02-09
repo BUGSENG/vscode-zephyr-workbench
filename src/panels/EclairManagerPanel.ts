@@ -9,6 +9,7 @@ import { execCommandWithEnv, execShellCommandWithEnv, getOutputChannel, classify
 import { getInternalDirRealPath } from "../utils/utils";
 import { getExtraPaths, normalizePath, setExtraPath } from "../utils/envYamlUtils";
 import type { IEclairExtension } from "../ext/eclair_api";
+import type { WebviewMessage } from "../utils/eclairEvent";
 
 interface IEclairConfig {
   installPath?: string;
@@ -612,7 +613,7 @@ export class EclairManagerPanel {
    * This is the main bridge between UI actions and backend logic.
    */
   private _setWebviewMessageListener(webview: vscode.Webview) {
-    webview.onDidReceiveMessage(async (m: any) => {
+    webview.onDidReceiveMessage(async (m: WebviewMessage) => {
       switch (m.command) {
         case "update-path": {
           const { tool, newPath } = m;
@@ -638,13 +639,6 @@ export class EclairManagerPanel {
           }
           break;
         }
-        case "toggle-add-to-path": {
-          const { tool, addToPath } = m;
-          if (tool === "eclair") {
-            webview.postMessage({ command: "add-to-path-updated", tool, doNotUse: !addToPath });
-          }
-          break;
-        }
         case "manage-license":
           vscode.env.openExternal(vscode.Uri.parse("http://localhost:1947"));
           break;
@@ -665,18 +659,6 @@ export class EclairManagerPanel {
             this._panel.webview.postMessage({ command: "set-install-path-placeholder", text: path });
           } finally {
             this._panel.webview.postMessage({ command: "toggle-spinner", show: false });
-          }
-          break;
-        }
-        case "browse-install-path": {
-          const pick = await vscode.window.showOpenDialog({
-            canSelectFiles: false,
-            canSelectFolders: true,
-            canSelectMany: false,
-            title: "Select ECLAIR installation"
-          });
-          if (pick && pick[0]) {
-            webview.postMessage({ command: "set-install-path", path: pick[0].fsPath });
           }
           break;
         }
@@ -1127,7 +1109,7 @@ export class EclairManagerPanel {
 <link rel="stylesheet" nonce="${nonce}" href="${codiconUri}">
 <title>ECLAIR Manager</title>
 </head>
-<body>
+<body id="eclair-manager-body">
 <h1>ECLAIR Manager</h1>
 
 <div class="summary">

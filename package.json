@@ -178,7 +178,6 @@
             "description": "User additional args to west command",
             "scope": "resource"
           },
-          
           "zephyr-workbench.build.active": {
             "type": "number",
             "default": 0,
@@ -454,11 +453,11 @@
         "title": "cve-bin-tool",
         "category": "Zephyr Workbench/Application"
       },
-        {
-          "command": "zephyr-workbench-app-explorer.spdx.analyze.dt-doctor",
-          "title": "DT Doctor",
-          "category": "Zephyr Workbench/Application"
-        },
+      {
+        "command": "zephyr-workbench-app-explorer.spdx.analyze.dt-doctor",
+        "title": "DT Doctor",
+        "category": "Zephyr Workbench/Application"
+      },
       {
         "command": "zephyr-workbench-app-explorer.run-app",
         "title": "Flash",
@@ -607,7 +606,7 @@
         "title": "Install Python Dependencies",
         "icon": "$(package)",
         "category": "Zephyr Workbench/Workspace"
-      },      
+      },
       {
         "command": "zephyr-workbench-sdk-explorer.open-wizard",
         "title": "Add Toolchain",
@@ -866,8 +865,7 @@
           "group": "zephyr@999"
         }
       ],
-      "editor/context": [
-      ],
+      "editor/context": [],
       "view/item/context": [
         {
           "command": "zephyr-workbench-app-explorer.build-app",
@@ -1218,7 +1216,7 @@
         {
           "command": "zephyr-workbench-app-explorer.change-toolchain",
           "group": "0@view/item/context@5",
-          "when":  "view == zephyr-workbench-app-explorer && viewItem == zephyr-application"
+          "when": "view == zephyr-workbench-app-explorer && viewItem == zephyr-application"
         },
         {
           "submenu": "zephyr-workbench-app-explorer.sysbuild-submenu",
@@ -1255,7 +1253,7 @@
         {
           "command": "zephyr-workbench-app-explorer.change-toolchain",
           "group": "0@view/item/context@5",
-          "when":  "view == zephyr-workbench-app-explorer && viewItem =~ /^zephyr-build-config/"
+          "when": "view == zephyr-workbench-app-explorer && viewItem =~ /^zephyr-build-config/"
         },
         {
           "submenu": "zephyr-workbench-app-explorer.sysbuild-submenu",
@@ -1320,28 +1318,28 @@
         }
       ],
       "zephyr-workbench-app-explorer.static-code-analysis": [
-          {
-            "command": "zephyr-workbench.eclair-manager.open",
-            "group": "0@view/item/context@1",
-            "when": "view == zephyr-workbench-app-explorer && viewItem == zephyr-application"
-          },
-          {
-            "command": "zephyr-workbench-app-explorer.spdx.analyze.dt-doctor",
-            "group": "0@view/item/context@2",
-            "when": "view == zephyr-workbench-app-explorer && viewItem == zephyr-application"
-          }
+        {
+          "command": "zephyr-workbench.eclair-manager.open",
+          "group": "0@view/item/context@1",
+          "when": "view == zephyr-workbench-app-explorer && viewItem == zephyr-application"
+        },
+        {
+          "command": "zephyr-workbench-app-explorer.spdx.analyze.dt-doctor",
+          "group": "0@view/item/context@2",
+          "when": "view == zephyr-workbench-app-explorer && viewItem == zephyr-application"
+        }
       ],
       "zephyr-workbench-app-explorer.config.static-code-analysis": [
-          {
-            "command": "zephyr-workbench.eclair-manager.open",
-            "group": "0@view/item/context@1",
-            "when": "view == zephyr-workbench-app-explorer && viewItem =~ /^zephyr-build-config/"
-          },
-          {
-            "command": "zephyr-workbench-app-explorer.spdx.analyze.dt-doctor",
-            "group": "0@view/item/context@2",
-            "when": "view == zephyr-workbench-app-explorer && viewItem =~ /^zephyr-build-config/"
-          }
+        {
+          "command": "zephyr-workbench.eclair-manager.open",
+          "group": "0@view/item/context@1",
+          "when": "view == zephyr-workbench-app-explorer && viewItem =~ /^zephyr-build-config/"
+        },
+        {
+          "command": "zephyr-workbench-app-explorer.spdx.analyze.dt-doctor",
+          "group": "0@view/item/context@2",
+          "when": "view == zephyr-workbench-app-explorer && viewItem =~ /^zephyr-build-config/"
+        }
       ],
       "zephyr-workbench-app-explorer.spdx": [
         {
@@ -1389,11 +1387,11 @@
         {
           "command": "zephyr-workbench-app-explorer.spdx.analyze.cve-bin-tool",
           "group": "0@view/item/context@2"
-          },
-          {
-            "command": "zephyr-workbench-app-explorer.spdx.analyze.dt-doctor",
-            "group": "0@view/item/context@3"
-          }
+        },
+        {
+          "command": "zephyr-workbench-app-explorer.spdx.analyze.dt-doctor",
+          "group": "0@view/item/context@3"
+        }
       ],
       "commandPalette": [
         {
@@ -1666,7 +1664,6 @@
     "coverage": "nyc npm run test:unit"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
     "@types/mocha": "^10.0.6",
     "@types/node": "18.x",
     "@types/node-7z": "^2.1.8",
@@ -1676,6 +1673,7 @@
     "@typescript-eslint/parser": "^7.7.1",
     "@vscode/test-cli": "^0.0.8",
     "@vscode/test-electron": "^2.3.9",
+    "cross-env": "^7.0.3",
     "esbuild": "^0.16.10",
     "esbuild-plugin-copy": "^2.1.1",
     "eslint": "^8.57.0",
@@ -1684,10 +1682,14 @@
   },
   "dependencies": {
     "@microsoft/vscode-file-downloader-api": "^1.0.1",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "7zip-bin": "^5.2.0",
     "JSON": "^1.0.0",
     "node-7z": "^3.0.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "sudo-prompt": "^9.2.1",
     "yaml": "^2.4.3"
   },
