@@ -40,7 +40,7 @@ export function Summary(props: {
       </div>
       <div className="summary-actions">
         <div className="actions-title"><strong>Actions</strong></div>
-        <VscodeButton appearance="primary" onClick={() => post_message({ command: "browse-path", tool: "eclair" })}>
+        <VscodeButton appearance="primary" onClick={() => post_message({ command: "probe-eclair" })}>
           Refresh Status
         </VscodeButton>
         <VscodeButton appearance="primary" onClick={() => post_message({ command: "about-eclair" })}>
