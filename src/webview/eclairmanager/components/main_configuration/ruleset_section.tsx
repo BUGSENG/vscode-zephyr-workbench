@@ -1,10 +1,10 @@
 import React from "react";
-import { RulesetState, EclairStateAction } from "../state";
-import { VscodeButton, VscodeRadio, VscodeRadioGroup, VscodeTextField } from "./vscode";
-import { WebviewMessage } from "../../../utils/eclairEvent";
+import { ZephyrRulesetState, EclairStateAction } from "../../state";
+import { VscodeButton, VscodeRadio, VscodeRadioGroup, VscodeTextField } from "../vscode";
+import { WebviewMessage } from "../../../../utils/eclairEvent";
 
 export function RulesetSection(props: {
-  ruleset: RulesetState;
+  ruleset: ZephyrRulesetState;
   dispatch_state: React.Dispatch<EclairStateAction>;
   post_message: (message: WebviewMessage) => void;
   collectConfig: () => any;

@@ -1,6 +1,6 @@
 import React from "react";
 import { StatusState, InstallPathState, EclairStateAction } from "../state";
-import { VscodeButton, VscodeTextField } from "./vscode";
+import { VscodeButton, PickPath } from "./vscode";
 import { WebviewMessage } from "../../../utils/eclairEvent";
 
 export function Summary(props: {
@@ -13,17 +13,6 @@ export function Summary(props: {
   const statusText = props.status.installed ? "Installed" : "Not installed";
 
   const post_message = props.post_message;
-
-  const handleInstallPathEdit = () => {
-    if (props.installPath.editing) {
-      props.post_message({
-        command: "update-path",
-        tool: "eclair",
-        newPath: props.installPath.path.trim(),
-      });
-    }
-    props.dispatch_state({ type: "toggle-install-path-editing" });
-  };
 
   return (
     <div className="summary">
@@ -53,38 +42,19 @@ export function Summary(props: {
           Request Trial License
         </VscodeButton>
       </div>
-      <div className="grid-group-div">
-        <VscodeTextField
-          className="details-path-field"
-          placeholder={props.installPath.placeholder}
-          size="50"
-          value={props.installPath.path}
-          disabled={!props.installPath.editing}
-          onChange={(e: any) => props.dispatch_state({ type: "update-install-path", path: e.target.value })}
-          onKeyDown={(e: any) => {
-            if (e.key === "Enter" && props.installPath.editing) {
-              handleInstallPathEdit();
-            }
-          }}
-        >
-          Path:
-        </VscodeTextField>
-        <VscodeButton
-          className="browse-input-button"
-          appearance="secondary"
-          disabled={!props.installPath.editing}
-          onClick={() => props.post_message({ command: "browse-path", tool: "eclair" })}
-        >
-          <span className="codicon codicon-folder"></span>
-        </VscodeButton>
-        <VscodeButton
-          className="save-path-button"
-          appearance="primary"
-          onClick={handleInstallPathEdit}
-        >
-          {props.installPath.editing ? "Done" : "Edit"}
-        </VscodeButton>
-      </div>
+      <PickPath
+        value={props.installPath.path}
+        placeholder={props.installPath.placeholder}
+        on_selected={(newPath) => {
+          props.dispatch_state({ type: "update-install-path", path: newPath });
+          props.post_message({
+            command: "update-path",
+            tool: "eclair",
+            newPath: newPath.trim(),
+          });
+        }}
+        on_pick={() => props.post_message({ command: "browse-path", tool: "eclair" })}
+      />
     </div>
   );
 }

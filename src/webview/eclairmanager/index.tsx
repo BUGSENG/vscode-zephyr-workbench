@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useReducer } from "react";
 import { createRoot } from "react-dom/client";
 import type { ExtensionMessage, WebviewMessage } from "../../utils/eclairEvent.js";
-import { EclairState, EclairStateAction, default_eclair_state, eclairReducer } from "./state.js";
+import { EclairState, EclairStateAction, default_eclair_state, default_ruleset_state, eclairReducer } from "./state.js";
 import { Summary } from "./components/summary.js";
-import { RulesetSection } from "./components/ruleset_section.js";
 import { ReportsSection } from "./components/reports_section.js";
 import { ExtraConfigSection } from "./components/extra_config_section.js";
 import { CommandSection } from "./components/command_section.js";
 import { ReportViewerSection } from "./components/report_viewer.js";
+import { MainAnalysisConfigurationSection } from "./components/main_configuration.js";
 
 const BODY_ID = "eclair-manager-body";
 
@@ -36,12 +36,13 @@ function EclairManagerPanel() {
 
   // Collect config for sending to backend
   const collectConfig = useCallback(() => {
+    const ruleset = (state.analysis_configuration === null || state.analysis_configuration?.type !== "zephyr-ruleset") ? default_ruleset_state() : state.analysis_configuration.ruleset;
     return {
-      installPath: state.installPath.path,
-      extraConfig: state.extraConfig.path,
-      ruleset: state.ruleset.selected,
-      userRulesetName: state.ruleset.userRulesetName,
-      userRulesetPath: state.ruleset.userRulesetPath,
+      installPath: state.install_path.path,
+      extraConfig: state.extra_config.path,
+      ruleset: ruleset.selected,
+      userRulesetName: ruleset.userRulesetName,
+      userRulesetPath: ruleset.userRulesetPath,
       reports: state.reports.selected,
     };
   }, [state]);
@@ -68,13 +69,13 @@ function EclairManagerPanel() {
 
       <Summary
         status={state.status}
-        installPath={state.installPath}
+        installPath={state.install_path}
         post_message={post_message}
         dispatch_state={dispatch_state}
       />
 
-      <RulesetSection
-        ruleset={state.ruleset}
+      <MainAnalysisConfigurationSection
+        state={state}
         dispatch_state={dispatch_state}
         post_message={post_message}
         collectConfig={collectConfig}
@@ -86,7 +87,7 @@ function EclairManagerPanel() {
       />
 
       <ExtraConfigSection
-        extraConfig={state.extraConfig}
+        extra_config={state.extra_config}
         dispatch_state={dispatch_state}
         post_message={post_message}
       />
@@ -97,7 +98,7 @@ function EclairManagerPanel() {
       />
 
       <ReportViewerSection
-        reportServer={state.reportServer}
+        reportServer={state.report_server}
         post_message={post_message}
       />
     </div>
@@ -153,5 +154,15 @@ function handleMessage(
     case "report-server-stopped":
       dispatch({ type: "report-server-stopped" });
       break;
+    case "preset-content": {
+      const { source, template } = msg;
+      dispatch({ type: "preset-content", source, template });
+      break;
+    }
+    case "template-path-picked": {
+      const { kind, path } = msg;
+      dispatch({ type: "set-preset-path", kind, path });
+      break;
+    }
   }
 }

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 // Web component wrappers for VSCode UI Toolkit
 export function VscodeButton(
@@ -21,4 +21,266 @@ export function VscodeRadio(props: any) {
 
 export function VscodeCheckbox(props: any) {
   return React.createElement("vscode-checkbox", props, props.children);
+}
+
+export function VscodeDropdown(props: any) {
+  return React.createElement("vscode-dropdown", props, props.children);
+}
+
+export function VscodeOption(props: any) {
+  return React.createElement("vscode-option", props, props.children);
+}
+
+export function VscodePanel(props: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div style={{
+      marginBottom: "16px",
+      padding: "12px",
+      border: "1px solid var(--vscode-panel-border)",
+      borderRadius: "4px",
+      backgroundColor: "var(--vscode-editor-background)",
+      ...props.style
+    }}>
+      {props.children}
+    </div>
+  );
+}
+
+export function SimpleTooltip(props: {
+  text: string;
+  label?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <span
+      className="tooltip"
+      data-tooltip={props.text}
+      style={{ marginLeft: "8px", ...props.style }}
+    >
+      {props.label ?? "?"}
+    </span>
+  );
+}
+
+export function RichTooltip(props: {
+  label?: string;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <span className="rich-tooltip" style={{ marginLeft: "8px", ...props.style }}>
+      <span className="rich-tooltip-icon" aria-hidden="true">
+        {props.label ?? "?"}
+      </span>
+      <span className="rich-tooltip-content" role="tooltip">
+        {props.children}
+      </span>
+    </span>
+  );
+}
+
+export interface SearchableItem { id: string; name: string; description: string };
+
+export function SearchableDropdown<Item extends SearchableItem>(props: {
+  id: string;
+  label: string;
+  placeholder: string;
+  items: Item[];
+  selectedItem: Item | null;
+  onSelectItem: (item: Item) => void;
+}) {
+  const [searchText, setSearchText] = React.useState<string>('');
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const [showDropdown, setShowDropdown] = React.useState<boolean>(false);
+
+  const filteredItems = props.items.filter((item) =>
+    item.name.toLowerCase().includes(searchText.toLowerCase()) ||
+    item.description.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div style={{ marginBottom: '10px' }}>
+      <label htmlFor={props.id}>{props.label}</label>
+      <div ref={dropdownRef} style={{ position: 'relative', marginTop: '5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+          <input
+            id={props.id}
+            type="text"
+            placeholder={props.placeholder}
+            value={searchText}
+            onChange={(e) => {
+              setSearchText(e.target.value);
+              setShowDropdown(true);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            style={{
+              width: '100%',
+              padding: '4px 24px 4px 8px',
+              backgroundColor: 'var(--vscode-input-background)',
+              color: 'var(--vscode-input-foreground)',
+              border: '1px solid var(--vscode-input-border)',
+              outline: 'none',
+              fontFamily: 'var(--vscode-font-family)',
+              fontSize: 'var(--vscode-font-size)',
+            }}
+          />
+          <div style={{
+            position: 'absolute',
+            right: '8px',
+            pointerEvents: 'none',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+              <path fillRule="evenodd" clipRule="evenodd" d="M7.976 10.072l4.357-4.357.62.618L8.284 11h-.618L3 6.333l.619-.618 4.357 4.357z" />
+            </svg>
+          </div>
+        </div>
+        {showDropdown && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            maxHeight: '200px',
+            overflowY: 'auto',
+            backgroundColor: 'var(--vscode-dropdown-background)',
+            border: '1px solid var(--vscode-dropdown-border)',
+            zIndex: 1000,
+            marginTop: '2px',
+          }}>
+            {filteredItems.length > 0 ? (
+              filteredItems.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    props.onSelectItem(item);
+                    setSearchText(item.name);
+                    setShowDropdown(false);
+                  }}
+                  style={{
+                    padding: '6px 8px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid var(--vscode-dropdown-border)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--vscode-list-hoverBackground)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <div style={{ fontWeight: 500 }}>{item.name}</div>
+                  <div style={{ fontSize: '0.9em', color: 'var(--vscode-descriptionForeground)' }}>
+                    {item.description}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: '6px 8px', color: 'var(--vscode-descriptionForeground)' }}>
+                No presets found
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function PickPath({
+  value,
+  name,
+  placeholder,
+  on_selected,
+  on_pick,
+}: {
+  value: string;
+  name?: string;
+  placeholder?: string;
+  on_selected: (new_value: string) => void;
+  on_pick: () => void;
+}) {
+  const [current_value, set_current_value] = useState<string>(value);
+  const [editing, set_editing] = useState<boolean>(false);
+
+  // When the value prop changes (e.g. due to external updates), update the
+  // current_value state to reflect the new value.
+  useEffect(() => {
+    set_current_value(value);
+    //set_editing(false);
+  }, [value]);
+
+  // Ensure that if the value changes externally while the user is not editing.
+  if (!editing && value !== current_value) {
+    set_current_value(value);
+  }
+
+  return (<div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+    {name ? `${name}:` : "Path:"}
+    <VscodeTextField
+      className="details-path-field"
+      placeholder={placeholder}
+      size="38"
+      style={{ flexGrow: 1 }}
+      value={current_value}
+      disabled={!editing}
+      onChange={(e: any) => set_current_value(e.target.value)}
+      onKeyDown={(e: any) => {
+        if (e.key === "Enter" && editing) {
+          set_editing(false);
+          on_selected(current_value);
+        } else if (e.key === "Escape" && editing) {
+          set_current_value(value);
+          set_editing(false);
+        }
+      }}
+    />
+
+    {/* Pick button */}
+    {editing && (
+      <VscodeButton
+        className="browse-extra-input-button"
+        appearance="secondary"
+        onClick={() => {
+          on_pick();
+        }}
+      >
+        <span className="codicon codicon-folder"></span>
+      </VscodeButton>
+    )}
+
+    {/* Edit/Done button */}
+    <VscodeButton appearance="primary" onClick={() => {
+      if (editing) {
+        on_selected(current_value);
+        set_editing(false);
+      } else {
+        set_editing(true);
+      }
+    }}>
+      {editing ? "Done" : "Edit"}
+    </VscodeButton>
+
+    {/* Cancel button */}
+    {editing && (
+      <VscodeButton appearance="secondary" onClick={() => {
+        set_current_value(value);
+        set_editing(false);
+      }} style={{ marginLeft: '5px' }}>
+        Cancel
+      </VscodeButton>
+    )}
+  </div>);
 }

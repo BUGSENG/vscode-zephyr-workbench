@@ -1,3 +1,4 @@
+import { EclairPresetTemplateSource, EclairTemplate, EclairTemplateKind } from "./eclair/template";
 
 
 // Commands sent FROM extension backend TO webview frontend
@@ -19,6 +20,7 @@ export type ExtensionMessage = {
   text: string,
 } | {
   command: "set-install-path-placeholder",
+  text: string,
 } | {
   command: "set-user-ruleset-name",
   name: string,
@@ -29,6 +31,14 @@ export type ExtensionMessage = {
   command: "report-server-started",
 } | {
   command: "report-server-stopped",
+} | {
+  command: "preset-content",
+  source: EclairPresetTemplateSource,
+  template: EclairTemplate | { loading: string } | { error: string },
+} | {
+  command: "template-path-picked",
+  kind: EclairTemplateKind,
+  path: string,
 };
 
 // Commands sent FROM webview frontend TO extension backend
@@ -80,4 +90,10 @@ export type WebviewMessage = {
   command: "manage-license",
 } | {
   command: "request-trial",
+} | {
+  command: "load-preset-from-path",
+  path: string,
+} | {
+  command: "pick-preset-path",
+  kind: EclairTemplateKind,
 };

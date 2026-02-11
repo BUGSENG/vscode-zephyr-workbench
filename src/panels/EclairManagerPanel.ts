@@ -9,7 +9,8 @@ import { execCommandWithEnv, execShellCommandWithEnv, getOutputChannel, classify
 import { getInternalDirRealPath } from "../utils/utils";
 import { getExtraPaths, normalizePath, setExtraPath } from "../utils/envYamlUtils";
 import type { IEclairExtension } from "../ext/eclair_api";
-import type { WebviewMessage } from "../utils/eclairEvent";
+import type { ExtensionMessage, WebviewMessage } from "../utils/eclairEvent";
+import { parse_eclair_template_from_any } from "../utils/eclair/template_utils";
 
 interface IEclairConfig {
   installPath?: string;
@@ -316,7 +317,8 @@ export class EclairManagerPanel {
 
       // Store terminal reference
       this._reportServerTerminal = terminal;
-      this._panel.webview.postMessage({ command: "report-server-started" });
+      const post_message = (m: ExtensionMessage) => this._panel.webview.postMessage(m);
+      post_message({ command: "report-server-started" });
       vscode.window.showInformationMessage("ECLAIR report server started. Check your browser.");
     } catch (err: any) {
       vscode.window.showErrorMessage(`Failed to start ECLAIR report server: ${err.message || err}`);
@@ -335,7 +337,8 @@ export class EclairManagerPanel {
     // Dispose the terminal (this will kill the process)
     this._reportServerTerminal.dispose();
     this._reportServerTerminal = undefined;
-    this._panel.webview.postMessage({ command: "report-server-stopped" });
+    const post_message = (m: ExtensionMessage) => this._panel.webview.postMessage(m);
+    post_message({ command: "report-server-stopped" });
     vscode.window.showInformationMessage("ECLAIR report server stopped.");
   }
 
@@ -405,12 +408,13 @@ export class EclairManagerPanel {
     this._envWatcher = fs.watch(envYamlPath, async () => {
       this.loadEnvYaml();
       if (this._panel.visible) {
+        const post_message = (m: ExtensionMessage) => this._panel.webview.postMessage(m);
         const eclairInfo = this.getEclairPathFromEnv();
         const path = (typeof eclairInfo === 'object' && typeof eclairInfo.path === 'string') ? eclairInfo.path : '';
         const pathToShow = (!path || path === "") ? "Not Found" : path;
-        this._panel.webview.postMessage({ command: "set-install-path", path: pathToShow });
-        this._panel.webview.postMessage({ command: "set-path-status", text: pathToShow });
-        this._panel.webview.postMessage({ command: "set-install-path-placeholder", text: pathToShow });
+        post_message({ command: "set-install-path", path: pathToShow });
+        post_message({ command: "set-path-status", text: pathToShow });
+        post_message({ command: "set-install-path-placeholder", text: pathToShow });
       }
     });
   }
@@ -459,9 +463,9 @@ export class EclairManagerPanel {
     this.loadEnvYaml();
     this.startEnvWatcher();
     // persist in UI immediately with the saved value
-    this._panel.webview.postMessage({ command: 'set-install-path', path: normalized });
-    this._panel.webview.postMessage({ command: 'set-path-status', text: normalized });
-    this._panel.webview.postMessage({ command: 'set-install-path-placeholder', text: normalized });
+    const post_message = (m: ExtensionMessage) => this._panel.webview.postMessage(m);
+    post_message({ command: 'set-path-status', text: normalized });
+    post_message({ command: 'set-install-path-placeholder', text: normalized });
   }
 
   /**
@@ -526,6 +530,8 @@ export class EclairManagerPanel {
       vscode.window.showErrorMessage("ECLAIR is not installed. Please install ECLAIR and try again.");
     }
 
+    const post_message = (m: ExtensionMessage) => this._panel.webview.postMessage(m);
+
     // Read .ecl config path from active sca object and send to webview
     try {
       const folderUri = this.resolveApplicationFolderUri();
@@ -539,18 +545,18 @@ export class EclairManagerPanel {
         const raw = configs[idx]?.sca?.[0]?.extraConfig;
         extraConfigPath = raw && !["Checking", "Not Found"].includes(raw) ? raw : "";
       }
-      this._panel.webview.postMessage({ command: "set-extra-config", path: extraConfigPath });
+      post_message({ command: "set-extra-config", path: extraConfigPath });
     } catch {
-      this._panel.webview.postMessage({ command: "set-extra-config", path: "" });
+      post_message({ command: "set-extra-config", path: "" });
     }
 
     this._panel.onDidChangeViewState(async () => {
       if (this._panel.visible) {
         try {
-          this._panel.webview.postMessage({ command: "toggle-spinner", show: true });
+          post_message({ command: "toggle-spinner", show: true });
           await this.runEclair();
         } finally {
-          this._panel.webview.postMessage({ command: "toggle-spinner", show: false });
+          post_message({ command: "toggle-spinner", show: false });
         }
         try {
           const folderUri = this.resolveApplicationFolderUri();
@@ -564,9 +570,9 @@ export class EclairManagerPanel {
             const raw = configs[idx]?.sca?.[0]?.extraConfig;
             extraConfigPath = raw && !["Checking", "Not Found"].includes(raw) ? raw : "";
           }
-          this._panel.webview.postMessage({ command: "set-extra-config", path: extraConfigPath });
+          post_message({ command: "set-extra-config", path: extraConfigPath });
         } catch {
-          this._panel.webview.postMessage({ command: "set-extra-config", path: "" });
+          post_message({ command: "set-extra-config", path: "" });
         }
         try {
           const folderUri = this.resolveApplicationFolderUri();
@@ -581,11 +587,11 @@ export class EclairManagerPanel {
             userRulesetName = configs[idx].sca[0].userRulesetName || "";
             userRulesetPath = configs[idx].sca[0].userRulesetPath || "";
           }
-          this._panel.webview.postMessage({ command: "set-user-ruleset-name", name: userRulesetName });
-          this._panel.webview.postMessage({ command: "set-user-ruleset-path", path: userRulesetPath });
+          post_message({ command: "set-user-ruleset-name", name: userRulesetName });
+          post_message({ command: "set-user-ruleset-path", path: userRulesetPath });
         } catch {
-          this._panel.webview.postMessage({ command: "set-user-ruleset-name", name: "" });
-          this._panel.webview.postMessage({ command: "set-user-ruleset-path", path: "" });
+          post_message({ command: "set-user-ruleset-name", name: "" });
+          post_message({ command: "set-user-ruleset-path", path: "" });
         }
       }
     }, null, this._disposables);
@@ -593,18 +599,18 @@ export class EclairManagerPanel {
     if (!this._didInitialProbe) {
       this._didInitialProbe = true;
       try {
-        this._panel.webview.postMessage({ command: "toggle-spinner", show: true });
+        post_message({ command: "toggle-spinner", show: true });
         await this.runEclair();
       } finally {
-        this._panel.webview.postMessage({ command: "toggle-spinner", show: false });
+        post_message({ command: "toggle-spinner", show: false });
       }
     }
     
     // Initialize report server button states
     if (this._reportServerTerminal) {
-      this._panel.webview.postMessage({ command: "report-server-started" });
+      post_message({ command: "report-server-started" });
     } else {
-      this._panel.webview.postMessage({ command: "report-server-stopped" });
+      post_message({ command: "report-server-stopped" });
     }
   }
 
@@ -613,6 +619,8 @@ export class EclairManagerPanel {
    * This is the main bridge between UI actions and backend logic.
    */
   private _setWebviewMessageListener(webview: vscode.Webview) {
+    const post_message = (m: ExtensionMessage) => this._panel.webview.postMessage(m);
+
     webview.onDidReceiveMessage(async (m: WebviewMessage) => {
       switch (m.command) {
         case "update-path": {
@@ -621,7 +629,7 @@ export class EclairManagerPanel {
             this.saveEclairPathToEnv(newPath);
             const eclairInfo = this.getEclairPathFromEnv();
             const path = eclairInfo?.path || "";
-            webview.postMessage({ command: "path-updated", tool, path, success: true });
+            // TODO post_message({ command: "path-updated", tool, path, success: true });
           }
           break;
         }
@@ -634,7 +642,7 @@ export class EclairManagerPanel {
               this.saveEclairPathToEnv(chosen);
               const eclairInfo = this.getEclairPathFromEnv();
               const path = eclairInfo?.path || "";
-              webview.postMessage({ command: "path-updated", tool, path, success: true, FromBrowse: true });
+              // TODO post_message({ command: "path-updated", tool, path, success: true, FromBrowse: true });
             }
           }
           break;
@@ -650,15 +658,15 @@ export class EclairManagerPanel {
           break;
         case "refresh-status": {
           try {
-            this._panel.webview.postMessage({ command: "toggle-spinner", show: true });
+            post_message({ command: "toggle-spinner", show: true });
             await this.runEclair();
             const eclairInfo = this.getEclairPathFromEnv();
             const path = eclairInfo?.path || "";
-            this._panel.webview.postMessage({ command: "set-install-path", path });
-            this._panel.webview.postMessage({ command: "set-path-status", text: path });
-            this._panel.webview.postMessage({ command: "set-install-path-placeholder", text: path });
+            post_message({ command: "set-install-path", path });
+            post_message({ command: "set-path-status", text: path });
+            post_message({ command: "set-install-path-placeholder", text: path });
           } finally {
-            this._panel.webview.postMessage({ command: "toggle-spinner", show: false });
+            post_message({ command: "toggle-spinner", show: false });
           }
           break;
         }
@@ -677,14 +685,14 @@ export class EclairManagerPanel {
           });
           if (pick?.[0]) {
             const chosen = pick[0].fsPath;
-            webview.postMessage({ command: "set-extra-config", path: chosen });
+            post_message({ command: "set-extra-config", path: chosen });
             await this.saveExtraConfigToActiveSca(chosen);
           }
           break;
         }
         case "update-extra-config": {
           const newPath = (m?.newPath || "").toString().trim();
-          webview.postMessage({ command: "set-extra-config", path: newPath });
+          post_message({ command: "set-extra-config", path: newPath });
           await this.saveExtraConfigToActiveSca(newPath);
           break;
         }
@@ -841,7 +849,7 @@ export class EclairManagerPanel {
           });
           if (pick && pick[0]) {
             const chosen = pick[0].fsPath.trim();
-            webview.postMessage({ command: "set-user-ruleset-path", path: chosen });
+            post_message({ command: "set-user-ruleset-path", path: chosen });
             // save path select from the browse dialog
             const folderUri = this.resolveApplicationFolderUri();
             if (!folderUri) break;
@@ -862,6 +870,61 @@ export class EclairManagerPanel {
         }
         case "stop-report-server": {
           await this.stopReportServer();
+          break;
+        }
+        case "load-preset-from-path": {
+          const path = (m.path || "").toString().trim();
+          if (!path) {
+            post_message({ command: "preset-content", source: { type: "system-path", path }, template: { error: "Invalid preset path." } });
+            break;
+          }
+
+          post_message({ command: "preset-content", source: { type: "system-path", path }, template: { loading: "reading file" } });
+          try {
+            // TODO check and switch on extension
+            const content = await fs.promises.readFile(path, { encoding: "utf8" });
+            post_message({ command: "preset-content", source: { type: "system-path", path }, template: { loading: "parsing file" } });
+
+            let data: any;
+            try {
+              data = yaml.parse(content);
+            } catch (err: any) {
+              post_message({ command: "preset-content", source: { type: "system-path", path }, template: { error: `Failed to parse preset: ${err?.message || err}` } });
+              break;
+            }
+
+            post_message({ command: "preset-content", source: { type: "system-path", path }, template: { loading: "validating file" } });
+
+            let template: any;
+            try {
+              template = parse_eclair_template_from_any(data);
+            } catch (err: any) {
+              post_message({ command: "preset-content", source: { type: "system-path", path }, template: { error: `Invalid preset content: ${err?.message || err}` } });
+              break;
+            }
+
+            post_message({ command: "preset-content", source: { type: "system-path", path }, template });
+          } catch (err: any) {
+            post_message({ command: "preset-content", source: { type: "system-path", path }, template: { error: `Failed to read preset: ${err?.message || err}` } });
+          }
+          break;
+        }
+        case "pick-preset-path": {
+          const kind = m.kind;
+          const pick = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            title: "Select preset file",
+            filters: {
+              "ECL presets": ["yaml", "yml", "ecl"],
+              "All files": ["*"]
+            }
+          });
+          if (pick && pick[0]) {
+            const chosen = pick[0].fsPath.trim();
+            post_message({ command: "template-path-picked", kind, path: chosen });
+          }
           break;
         }
       }
@@ -1030,9 +1093,10 @@ export class EclairManagerPanel {
    */
   private async runEclair() {
     this.loadEnvYaml();
-    this._panel.webview.postMessage({ command: "toggle-spinner", show: true });
-    this._panel.webview.postMessage({ command: "set-path-status", text: "Checking" });
-    this._panel.webview.postMessage({ command: "set-install-path-placeholder", text: "Checking" });
+    const post_message = (m: ExtensionMessage) => this._panel.webview.postMessage(m);
+    post_message({ command: "toggle-spinner", show: true });
+    post_message({ command: "set-path-status", text: "Checking" });
+    post_message({ command: "set-install-path-placeholder", text: "Checking" });
 
     const readStdout = async (proc: any) => {
       let out = "";
@@ -1085,12 +1149,12 @@ export class EclairManagerPanel {
     }
 
     const eclairPath = (typeof eclairInfo === 'object' && typeof eclairInfo.path === 'string') ? eclairInfo.path : '';
-    this._panel.webview.postMessage({ command: 'set-install-path', path: eclairPath });
-    this._panel.webview.postMessage({ command: 'set-path-status', text: eclairPath });
-    this._panel.webview.postMessage({ command: 'set-install-path-placeholder', text: eclairPath });
+    post_message({ command: 'set-install-path', path: eclairPath });
+    post_message({ command: 'set-path-status', text: eclairPath });
+    post_message({ command: 'set-install-path-placeholder', text: eclairPath });
 
-    this._panel.webview.postMessage({ command: 'eclair-status', installed, version: installed ? version! : 'unknown' });
-    this._panel.webview.postMessage({ command: "toggle-spinner", show: false });
+    post_message({ command: 'eclair-status', installed, version: installed ? version! : 'unknown' });
+    post_message({ command: "toggle-spinner", show: false });
 
   }
 
