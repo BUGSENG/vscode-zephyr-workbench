@@ -1,6 +1,6 @@
 import React from "react";
 import { ZephyrRulesetState, EclairStateAction } from "../../state";
-import { VscodeButton, VscodeRadio, VscodeRadioGroup, VscodeTextField } from "../vscode";
+import { PickPath, VscodeButton, VscodeRadio, VscodeRadioGroup, VscodeTextField } from "../vscode";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
 
 export function RulesetSection(props: {
@@ -68,32 +68,13 @@ export function RulesetSection(props: {
         <VscodeButton appearance="primary" onClick={handleUserRulesetNameEdit}>
           {props.ruleset.userRulesetNameEditing ? "Done" : "Edit"}
         </VscodeButton>
-        <VscodeTextField
-          className="details-path-field"
-          placeholder="Path to analysis_<RULESET>.ecl (optional)"
-          size="38"
-          value={props.ruleset.userRulesetPath}
-          disabled={!props.ruleset.userRulesetPathEditing}
-          onChange={(e: any) => props.dispatch_state({ type: "update-user-ruleset-path", path: e.target.value })}
-          onKeyDown={(e: any) => {
-            if (e.key === "Enter" && props.ruleset.userRulesetPathEditing) {
-              handleUserRulesetPathEdit();
-            }
-          }}
-        >
-          Ruleset Path:
-        </VscodeTextField>
-        <VscodeButton
-          className="browse-extra-input-button"
-          appearance="secondary"
-          disabled={!props.ruleset.userRulesetPathEditing}
-          onClick={() => props.post_message({ command: "browse-user-ruleset-path" })}
-        >
-          <span className="codicon codicon-folder"></span>
-        </VscodeButton>
-        <VscodeButton appearance="primary" onClick={handleUserRulesetPathEdit}>
-          {props.ruleset.userRulesetPathEditing ? "Done" : "Edit"}
-        </VscodeButton>
+        <PickPath
+          value={props.ruleset.userRulesetPath || ""}
+          name="Ruleset file"
+          placeholder="path/to/analysis_config.ecl"
+          on_selected={(value) => props.dispatch_state({ type: "update-user-ruleset-path", path: value })}
+          on_pick={() => props.post_message({ command: "browse-user-ruleset-path" })}
+        />
       </div>
     </div>
   );

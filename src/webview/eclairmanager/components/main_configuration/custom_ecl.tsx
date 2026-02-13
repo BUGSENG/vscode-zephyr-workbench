@@ -1,7 +1,7 @@
 import React from "react";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
 import { CustomEclState, EclairStateAction } from "../../state";
-import { VscodeButton, VscodeTextField } from "../vscode";
+import { PickPath, VscodeButton, VscodeTextField } from "../vscode";
 
 export function CustomEclSection(props: {
   state: CustomEclState;
@@ -10,23 +10,13 @@ export function CustomEclSection(props: {
 }) {
   return (<>
     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-      <VscodeTextField
-        className="details-path-field"
-        placeholder="path/to/analysis_config.ecl"
-        size="30"
-        style={{ flexGrow: 1 }}
+      <PickPath
         value={props.state.ecl || ""}
-        // TODO onChange
-      >
-        Custom ECL file:
-      </VscodeTextField>
-      <VscodeButton
-        className="browse-extra-input-button"
-        appearance="secondary"
-        // TODO onClick
-      >
-        <span className="codicon codicon-folder"></span>
-      </VscodeButton>
+        name="ECL file"
+        placeholder="path/to/analysis_config.ecl"
+        on_selected={() => {}} // TODO
+        on_pick={() => {}} // TODO
+      />
     </div>
   </>);
 }
