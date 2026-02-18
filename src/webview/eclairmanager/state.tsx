@@ -218,7 +218,7 @@ export type EclairStateAction =
   | { type: "repo-scan-started"; name: string }
   | { type: "repo-scan-done"; name: string }
   | { type: "repo-scan-failed"; name: string; message: string }
-  | { type: "generic-state-update", updater: (state: WritableDraft<EclairState>) => EclairState | undefined };
+  | { type: "update-state", updater: (state: WritableDraft<EclairState>) => EclairState | undefined };
 
 function build_analysis_configuration_from_config(cfg: EclairScaConfig): AnalysisConfigurationState {
   return match(cfg.config)
@@ -512,8 +512,6 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
     .with({ type: "repo-scan-failed" }, ({ name, message }) => {
       draft.repos_scan_state[name] = { status: "error", message };
     })
-    .with({ type: "generic-state-update" }, ({ updater }) => {
-      return updater(draft);
-    })
+    .with({ type: "update-state" }, ({ updater }) => updater(draft))
     .exhaustive());
 }

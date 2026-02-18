@@ -23,7 +23,7 @@ function origin_hash(origin: string): string {
  * Returns the on-disk path for a specific (origin, ref) checkout:
  * `<internalToolsDir>/sca/eclair/repos/checkouts/<origin-hash>/<ref>/`
  *
- * The `ref` component is sanitised so it cannot contain path separators or
+ * The `ref` component is sanitized so it cannot contain path separators or
  * characters illegal on common filesystems. The logical repo `name` is
  * intentionally NOT part of the path: two workspace projects may use repos
  * with different names that point at the same origin, and they should share
@@ -113,7 +113,7 @@ export async function ensureRepoCheckout(name: string, origin: string, ref: stri
     await run("git checkout FETCH_HEAD", checkoutDir);
   } catch {
     // Fallback: plain shallow clone (slower but universally supported).
-    // Remove the half-initialised directory and clone fresh.
+    // Remove the half-initialized directory and clone fresh.
     await fs.promises.rm(checkoutDir, { recursive: true, force: true });
     await fs.promises.mkdir(checkoutDir, { recursive: true });
     await run(
