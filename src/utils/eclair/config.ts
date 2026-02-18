@@ -6,9 +6,9 @@ export const EclairPresetTemplateSourceSchema = z.discriminatedUnion("type", [
     path: z.string(),
   }),
   z.object({
-    type: z.literal("repo-rev-path"),
+    type: z.literal("repo-path"),
+    /** Logical repo name */
     repo: z.string(),
-    rev: z.string(),
     path: z.string(),
   }),
 ]);
@@ -58,6 +58,8 @@ export const EclairScaMainConfigSchema = z.discriminatedUnion("type", [
 
 export type EclairScaMainConfig = z.infer<typeof EclairScaMainConfigSchema>;
 
+export type EclairScaConfigType = EclairScaMainConfig["type"];
+
 export const ALL_ECLAIR_REPORTS = [
   "ECLAIR_METRICS_TAB",
   "ECLAIR_REPORTS_TAB",
@@ -74,12 +76,39 @@ export const ALL_ECLAIR_REPORTS = [
 
 export type EclairScaReportOption = typeof ALL_ECLAIR_REPORTS[number];
 
+/**
+ * A single repository entry: a human-readable logical name mapped to an origin
+ * URL and the revision (branch, tag, or commit SHA) to check out.
+ */
+export const EclairRepoEntrySchema = z.object({
+  origin: z.string(),
+  ref: z.string(),
+});
+
+export type EclairRepoEntry = z.infer<typeof EclairRepoEntrySchema>;
+
+/**
+ * A map from logical repo name (used as the checkout directory name) to its
+ * origin/rev descriptor.  These repos are checked out on demand into the
+ * extension's internal storage and used as sources for preset templates.
+ *
+ * Example:
+ *   repos:
+ *     my-presets:
+ *       origin: https://github.com/acme/eclair-presets.git
+ *       rev: main
+ */
+export const EclairReposSchema = z.record(z.string(), EclairRepoEntrySchema);
+
+export type EclairRepos = z.infer<typeof EclairReposSchema>;
+
 export const EclairScaConfigSchema = z.object({
   install_path: z.string().optional(),
   config: EclairScaMainConfigSchema,
   extra_config: z.string().optional(),
   // either EclairScaReportOption or "ALL"
   reports: z.array(z.union([z.enum(ALL_ECLAIR_REPORTS), z.literal("ALL")])).optional(),
+  repos: EclairReposSchema.optional(),
 });
 
 export type EclairScaConfig = z.infer<typeof EclairScaConfigSchema>;

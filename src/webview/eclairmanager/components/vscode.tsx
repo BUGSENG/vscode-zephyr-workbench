@@ -113,6 +113,52 @@ export function VscodeAlert(props: {
   );
 }
 
+export type StatusBadgeState =
+  | { kind: "idle"; label?: string }
+  | { kind: "loading"; label?: string }
+  | { kind: "success"; label: string; detail?: string }
+  | { kind: "error"; label?: string; message: string };
+
+export function StatusBadge({ status }: { status: StatusBadgeState }) {
+  switch (status.kind) {
+    case "idle":
+      return (
+        <span style={{ color: "var(--vscode-descriptionForeground)", fontSize: "0.85em" }}>
+          {status.label ?? "Not scanned"}
+        </span>
+      );
+    case "loading":
+      return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.85em", color: "var(--vscode-descriptionForeground)" }}>
+          <span className="codicon codicon-loading codicon-modifier-spin" aria-hidden="true" style={{ fontSize: "0.95em" }} />
+          {status.label ?? "Loading\u2026"}
+        </span>
+      );
+    case "success":
+      return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.85em", color: "var(--vscode-testing-iconPassed)" }}>
+          <span className="codicon codicon-check" aria-hidden="true" />
+          {status.label}
+          {status.detail && (
+            <span style={{ color: "var(--vscode-descriptionForeground)" }}>{status.detail}</span>
+          )}
+        </span>
+      );
+    case "error": {
+      const label = status.label ?? "Error";
+      return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.85em", color: "var(--vscode-errorForeground)" }}>
+          <span className="codicon codicon-error" aria-hidden="true" />
+          {label}
+          <RichTooltip
+            style={{ marginLeft: "2px", color: "var(--vscode-errorForeground)", fontSize: "0.9em" }}
+          >{status.message}</RichTooltip>
+        </span>
+      );
+    }
+  }
+}
+
 export function SimpleTooltip(props: {
   text: string;
   label?: string;

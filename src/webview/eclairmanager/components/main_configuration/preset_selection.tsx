@@ -1,17 +1,43 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
-import { AvailablePresetsState, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetsSelectionState, SinglePresetSelectionState } from "../../state";
-import { PickPath, SearchableDropdown, SearchableItem, VscodeButton, VscodeCheckbox, VscodePanel, SimpleTooltip, RichTooltip } from "../vscode";
+import { AvailablePresetsState, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetsSelectionState, RepoScanState, SinglePresetSelectionState } from "../../state";
+import { PickPath, SearchableDropdown, SearchableItem, StatusBadge, StatusBadgeState, VscodeAlert, VscodeButton, VscodeCheckbox, VscodePanel, SimpleTooltip, RichTooltip, VscodeTextField } from "../vscode";
 import { EclairTemplate, EclairTemplateKind, EclairTemplateOption } from "../../../../utils/eclair/template";
-import { EclairPresetTemplateSource, PresetSelectionState } from "../../../../utils/eclair/config";
+import { EclairPresetTemplateSource, EclairRepos, PresetSelectionState } from "../../../../utils/eclair/config";
+import { RepoManagementSection } from "./preset_selection/repo_management";
 
 export function PresetSelection(props: {
   state: PresetsSelectionState;
   available_presets: AvailablePresetsState;
+  repos: EclairRepos;
+  repos_scan_state: Record<string, RepoScanState>;
   dispatch_state: React.Dispatch<EclairStateAction>;
   post_message: (message: WebviewMessage) => void;
 }) {
   return (<>
+    <h3>
+      Repository management
+      <SimpleTooltip text="Manage Git repositories that provide preset templates" />
+      <RichTooltip>
+        <div style={{ fontWeight: 600, marginBottom: "4px" }}>Preset repositories</div>
+        <div style={{ fontSize: "0.9em" }}>
+          Preset templates can be sourced from Git repositories. Use the form below to add, edit, or remove repositories. Each repository is identified by a name, a Git origin URL, and a revision (branch, tag, or commit SHA). Repositories are checked out on demand and scanned for preset templates.
+        </div>
+      </RichTooltip>
+      <RichTooltip>
+        Manage the Git repositories that provide preset templates. Each repository
+        is identified by a short name, a Git origin URL, and a revision (branch,
+          tag, or commit SHA).
+      </RichTooltip>
+    </h3>
+    <RepoManagementSection
+      repos={props.repos}
+      repos_scan_state={props.repos_scan_state}
+      available_presets={props.available_presets}
+      dispatch_state={props.dispatch_state}
+      post_message={props.post_message}
+    />
+
     <h3>
       Ruleset selection
       <SimpleTooltip text="Select a base ruleset that defines the default set of checks for the analysis." />
@@ -88,19 +114,19 @@ function SinglePresetSelection(props: {
           <VscodeButton appearance="secondary" onClick={on_remove} title="Remove preset">Remove</VscodeButton>
         </div>
 
-        {template === undefined ? (<>
-          <div style={{ color: "var(--vscode-errorForeground)" }}>Error: Preset not found in available presets</div>
-        </>) : "loading" in template ? (<>
-          <div>Loading preset...</div>
-        </>) : "error" in template ? (<>
-          <div style={{ color: "var(--vscode-errorForeground)" }}>Error loading preset: {template.error}</div>
-        </>) : (<>
+        {template === undefined ? (
+          <VscodeAlert type="error">Preset not found in available presets.</VscodeAlert>
+        ) : "loading" in template ? (
+          <VscodeAlert type="info">{template.loading}…</VscodeAlert>
+        ) : "error" in template ? (
+          <VscodeAlert type="error">Error loading preset: {template.error}</VscodeAlert>
+        ) : (
           <PresetSettings
             template={template}
             preset={preset}
             dispatch_state={props.dispatch_state}
           />
-        </>)}
+        )}
       </VscodePanel>
     );
   }
@@ -156,19 +182,19 @@ function MultiPresetSelection(props: {
                 <VscodeButton appearance="secondary" onClick={on_remove} title="Remove preset">Remove</VscodeButton>
               </div>
 
-              {template === undefined ? (<>
-                <div style={{ color: "var(--vscode-errorForeground)" }}>Error: Preset not found in available presets</div>
-              </>) : "loading" in template ? (<>
-                <div>Loading preset...</div>
-              </>) : "error" in template ? (<>
-                <div style={{ color: "var(--vscode-errorForeground)" }}>Error loading preset: {template.error}</div>
-              </>) : (<>
+              {template === undefined ? (
+                <VscodeAlert type="error">Preset not found in available presets.</VscodeAlert>
+              ) : "loading" in template ? (
+                <VscodeAlert type="info">{template.loading}…</VscodeAlert>
+              ) : "error" in template ? (
+                <VscodeAlert type="error">Error loading preset: {template.error}</VscodeAlert>
+              ) : (
                 <PresetSettings
                   template={template}
                   preset={preset}
                   dispatch_state={props.dispatch_state}
                 />
-              </>)}
+              )}
             </VscodePanel>
           );
         })}
@@ -224,22 +250,20 @@ function PresetPicker(props: {
         source: { type: "system-path", path },
       });
     }
-    for (const [repo, by_rev_path] of props.available_presets.by_repo_rev_path) {
-      for (const [rev, by_path] of by_rev_path) {
-        for (const [path, preset] of by_path) {
-          if ("loading" in preset || "error" in preset) {
-            continue;
-          }
-          if (preset.kind !== props.kind) {
-            continue;
-          }
-          items.push({
-            id: `${repo}@${rev}:${path}`,
-            name: preset.title,
-            description: preset.description,
-            source: { type: "repo-rev-path", repo, rev, path },
-          });
+    for (const [repo, by_path] of props.available_presets.by_repo_path) {
+      for (const [path, preset] of by_path) {
+        if ("loading" in preset || "error" in preset) {
+          continue;
         }
+        if (preset.kind !== props.kind) {
+          continue;
+        }
+        items.push({
+          id: `${repo}:${path}`,
+          name: preset.title,
+          description: preset.description,
+          source: { type: "repo-path", repo, path },
+        });
       }
     }
     return items;
@@ -296,7 +320,11 @@ function EclairPresetTemplateSourceDisplay({
   if (source.type === "system-path") {
     return <>Path: <code>{source.path}</code></>;
   } else {
-    return <>Custom source (<strong>TODO</strong>)</>;
+    return (
+      <>
+        Repo <code>{source.repo}</code>: <code>{source.path}</code>
+      </>
+    );
   }
 }
 

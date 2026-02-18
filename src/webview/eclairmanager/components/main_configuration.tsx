@@ -1,10 +1,11 @@
-import React from "react";
+import React, { JSX } from "react";
 import { WebviewMessage } from "../../../utils/eclairEvent";
 import { EclairState, EclairStateAction, ZephyrRulesetState } from "../state";
-import { VscodeRadio, VscodeRadioGroup } from "./vscode";
+import { RichTooltip, VscodeRadio, VscodeRadioGroup } from "./vscode";
 import { RulesetSection } from "./main_configuration/ruleset_section";
 import { CustomEclSection } from "./main_configuration/custom_ecl";
 import { PresetSelection } from "./main_configuration/preset_selection";
+import { EclairScaConfigType } from "../../../utils/eclair/config";
 
 
 export function MainAnalysisConfigurationSection({
@@ -16,12 +17,7 @@ export function MainAnalysisConfigurationSection({
   dispatch_state: React.Dispatch<EclairStateAction>;
   post_message: (message: WebviewMessage) => void;
 }) {
-  const rulesets = ["preset", "custom-ecl", "zephyr-ruleset"];
-  const ruleset_description = {
-    "preset": <>Use a preset configuration based on rulesets, variants and tailorings</>,
-    "custom-ecl": <>Provide a custom ECL (<code>.ecl</code>) file</>,
-    "zephyr-ruleset": <>Use a builtin Zephyr ruleset</>,
-  };
+  const rulesets: EclairScaConfigType[] = ["preset", "custom-ecl", "zephyr-ruleset"];
 
   const configuration = state.analysis_configuration;
 
@@ -33,13 +29,13 @@ export function MainAnalysisConfigurationSection({
         orientation="vertical"
         value={state.analysis_configuration?.type || null}
         onChange={(e: any) => {
-          const type = e.target.value as "preset" | "custom-ecl" | "zephyr-ruleset";
+          const type = e.target.value as EclairScaConfigType;
           dispatch_state({ type: "update-configuration-type", configurationType: type });
         }}
       >
         {rulesets.map((r) => (
           <VscodeRadio key={r} name="ruleset" value={r}>
-            <strong>{r === "USER" ? "user defined" : r}</strong>: {ruleset_description[r as keyof typeof ruleset_description]}
+            <strong>{r}</strong>: {RULESET_DESCRIPTION[r as keyof typeof RULESET_DESCRIPTION]}
           </VscodeRadio>
         ))}
       </VscodeRadioGroup>
@@ -56,6 +52,8 @@ export function MainAnalysisConfigurationSection({
         <PresetSelection
           state={configuration.state}
           available_presets={state.available_presets}
+          repos={state.repos}
+          repos_scan_state={state.repos_scan_state}
           dispatch_state={dispatch_state}
           post_message={post_message}
         />
@@ -75,3 +73,58 @@ export function MainAnalysisConfigurationSection({
     </div>
   );
 }
+
+const ZEPHYR_ECLAIR_URL = "https://docs.zephyrproject.org/latest/develop/sca/eclair.html";
+const ZEPHYR_CODING_GUIDELINES_URL = "https://docs.zephyrproject.org/latest/contribute/coding_guidelines/index.html";
+
+const RULESET_DESCRIPTION: Record<EclairScaConfigType, JSX.Element> = {
+  "preset": <>
+    Use a preset configuration based on rulesets, variants and tailorings
+    <RichTooltip>
+      <p>
+        Allows to use a combination of <b>rulesets</b>, <b>variants</b>, and <b>tailorings</b> from a set of templates.
+      </p>
+      <p>
+      The presets are ECL files with attached metadata that can be combined to create a flexible, configurable and reusable analysis configuration.
+      </p>
+      <p>
+        Presets are stored in Git repositories that are managed in the <i>Preset Repositories</i> section below. They can also be loaded from individual ECL files using the <i>Custom ECL</i> option.
+      </p>
+      <p>
+        See also:
+      </p>
+      <ul>
+        <li><a href="https://github.com/BUGSENG/zephyr-workbench-eclair-presets"><code>BUGSENG/zephyr-workbench-eclair-presets</code></a>: the reference repository for Eclair SCA presets for Zephyr projects, maintained by BUGSENG</li>
+      </ul>
+    </RichTooltip>
+  </>,
+  "custom-ecl": <>
+    Provide a custom ECL (<code>.ecl</code>) file
+    <RichTooltip>
+      <p>
+        Allows to use a custom ECL file as the analysis configuration. The ECL file must be provided by the user and follow the expected format for Eclair SCA analysis configurations.
+      </p>
+      <p>
+        This option is useful when you already have a valid configuration for your project that you want to reuse with this interface
+      </p>
+    </RichTooltip>
+  </>,
+  "zephyr-ruleset": <>
+    Use a builtin Zephyr ruleset
+    <RichTooltip>
+      <p>
+        Zephyr supports an upstream <a href={ZEPHYR_ECLAIR_URL}>integration</a> with ECLAIR.
+      </p>
+      <p>
+        This integration offers a predefined set of configuration that are used by the Zephyr project and are kept up to date by the Zephyr maintainers.
+      </p>
+      <p>
+        See also:
+      </p>
+      <ul>
+        <li><a href={ZEPHYR_ECLAIR_URL}>Zephyr ECLAIR Support</a></li>
+        <li><a href={ZEPHYR_CODING_GUIDELINES_URL}>Zephyr Coding Guidelines</a></li>
+      </ul>
+    </RichTooltip>
+  </>,
+};

@@ -1,4 +1,4 @@
-import { EclairPresetTemplateSource, EclairScaConfig, PresetSelectionState } from "../../utils/eclair/config";
+import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig, PresetSelectionState } from "../../utils/eclair/config";
 import { EclairTemplate, EclairTemplateKind } from "../../utils/eclair/template";
 
 const default_install_path_placeholder = "Enter the tool's path if not in the global PATH";
@@ -10,6 +10,10 @@ export interface EclairState {
   extra_config: ExtraConfigState;
   reports: ReportsState;
   report_server: ReportServerState;
+  repos: EclairRepos;
+
+  /** Per-repo scan status (loading / success with template count / error). */
+  repos_scan_state: Record<string, RepoScanState>;
 
   available_presets: AvailablePresetsState;
 }
@@ -37,9 +41,11 @@ export function default_eclair_state(): EclairState {
     report_server: {
       running: false,
     },
+    repos: {},
+    repos_scan_state: {},
     available_presets: {
       by_path: new Map(),
-      by_repo_rev_path: new Map(),
+      by_repo_path: new Map(),
     },
   };
 }
@@ -109,20 +115,25 @@ function default_presets_selection_state(): PresetsSelectionState {
 };
 
 export interface AvailablePresetsState {
+  /** Preset templates loaded from local filesystem paths. */
   by_path: Map<string, EclairTemplate | { loading: string } | { error: string }>;
-  by_repo_rev_path: Map<string, Map<string, Map<string, EclairTemplate | { loading: string } | { error: string }>>>;
+  /**
+   * Preset templates loaded from named repository entries.
+   * Outer key: logical repo name (matches EclairScaConfig.repos key).
+   * Inner key: file path relative to the repo root.
+   */
+  by_repo_path: Map<string, Map<string, EclairTemplate | { loading: string } | { error: string }>>;
 }
 
 export function get_preset_template_by_source(presets: AvailablePresetsState, source: EclairPresetTemplateSource): EclairTemplate | { loading: string } | { error: string } | undefined {
   switch (source.type) {
     case "system-path":
       return presets.by_path.get(source.path);
-    case "repo-rev-path":
-      const by_rev = presets.by_repo_rev_path.get(source.repo);
-      if (!by_rev) return undefined;
-      const by_path = by_rev.get(source.rev);
+    case "repo-path": {
+      const by_path = presets.by_repo_path.get(source.repo);
       if (!by_path) return undefined;
       return by_path.get(source.path);
+    }
   }
 }
 
@@ -147,6 +158,13 @@ export interface ReportsState {
 export interface ReportServerState {
   running: boolean;
 }
+
+/** Tracks the scan/load status of a single preset repository. */
+export type RepoScanState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "success"; templateCount: number }
+  | { status: "error"; message: string };
 
 
 export type EclairStateAction =
@@ -182,7 +200,15 @@ export type EclairStateAction =
   | { type: "remove-selected-preset"; kind: EclairTemplateKind; index: number }
   | { type: "preset-content"; source: EclairPresetTemplateSource; template: EclairTemplate | { loading: string } | { error: string } }
   | { type: "set-preset-path"; kind: EclairTemplateKind; path: string }
-  | { type: "set-or-add-preset"; kind: EclairTemplateKind; source: EclairPresetTemplateSource; };
+  | { type: "set-or-add-preset"; kind: EclairTemplateKind; source: EclairPresetTemplateSource; }
+  // Repo management actions
+  | { type: "add-repo"; name: string; origin: string; rev: string }
+  | { type: "remove-repo"; name: string }
+  | { type: "update-repo"; name: string; origin: string; rev: string }
+  // Repo scan status actions
+  | { type: "repo-scan-started"; name: string }
+  | { type: "repo-scan-done"; name: string }
+  | { type: "repo-scan-failed"; name: string; message: string };
 
 function build_analysis_configuration_from_config(cfg: EclairScaConfig): AnalysisConfigurationState {
   switch (cfg.config.type) {
@@ -225,11 +251,26 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
 
     case "load-sca-config": {
       const cfg = action.config;
+      // When reloading config, reset scan states for any new/removed repos.
+      const newRepos = cfg.repos ?? {};
+      const newScanState: Record<string, RepoScanState> = {};
+      for (const name of Object.keys(newRepos)) {
+        // Preserve existing scan state if the repo entry didn't change.
+        const existing = state.repos[name];
+        const incoming = newRepos[name];
+        if (existing && existing.origin === incoming.origin && existing.ref === incoming.ref) {
+          newScanState[name] = state.repos_scan_state[name] ?? { status: "idle" };
+        } else {
+          newScanState[name] = { status: "idle" };
+        }
+      }
       return {
         ...state,
         analysis_configuration: build_analysis_configuration_from_config(cfg),
         extra_config: { path: cfg.extra_config ?? "" },
         reports: { selected: cfg.reports && cfg.reports.length > 0 ? [...cfg.reports] : ["ALL"] },
+        repos: newRepos,
+        repos_scan_state: newScanState,
       };
     }
 
@@ -636,22 +677,17 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
     case "preset-content": {
       const { source, template } = action;
       const newPresets = new Map(state.available_presets.by_path);
-      const newRepoRevPresets = new Map(state.available_presets.by_repo_rev_path);
+      const newRepoPresets = new Map(state.available_presets.by_repo_path);
 
       switch (source.type) {
         case "system-path":
           newPresets.set(source.path, template);
           break;
-        case "repo-rev-path": {
-          let byRev = newRepoRevPresets.get(source.repo);
-          if (!byRev) {
-            byRev = new Map();
-            newRepoRevPresets.set(source.repo, byRev);
-          }
-          let byPath = byRev.get(source.rev);
+        case "repo-path": {
+          let byPath = newRepoPresets.get(source.repo);
           if (!byPath) {
             byPath = new Map();
-            byRev.set(source.rev, byPath);
+            newRepoPresets.set(source.repo, byPath);
           }
           byPath.set(source.path, template);
           break;
@@ -662,7 +698,7 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
         ...state,
         available_presets: {
           by_path: newPresets,
-          by_repo_rev_path: newRepoRevPresets,
+          by_repo_path: newRepoPresets,
         }
       };
     }
@@ -777,7 +813,52 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
         }
       }
     }
-    default:
+    case "add-repo":
+    case "update-repo":
+      return {
+        ...state,
+        repos: { ...state.repos, [action.name]: { origin: action.origin, ref: action.rev } },
+        // Reset scan state when a repo is added or its configuration changes.
+        repos_scan_state: { ...state.repos_scan_state, [action.name]: { status: "idle" } },
+      };
+    case "remove-repo": {
+      const { [action.name]: _removedRepo, ...restRepos } = state.repos;
+      const { [action.name]: _removedScan, ...restScan } = state.repos_scan_state;
+      // Also clear all preset-content entries for this repo.
+      const newByRepoPath = new Map(state.available_presets.by_repo_path);
+      newByRepoPath.delete(action.name);
+      return {
+        ...state,
+        repos: restRepos,
+        repos_scan_state: restScan,
+        available_presets: { ...state.available_presets, by_repo_path: newByRepoPath },
+      };
+    }
+
+    case "repo-scan-started":
+      return {
+        ...state,
+        repos_scan_state: { ...state.repos_scan_state, [action.name]: { status: "loading" } },
+      };
+
+    case "repo-scan-done": {
+      // Count successfully loaded templates for this repo.
+      const byPath = state.available_presets.by_repo_path.get(action.name);
+      const templateCount = byPath
+        ? [...byPath.values()].filter(t => !("loading" in t) && !("error" in t)).length
+        : 0;
+      return {
+        ...state,
+        repos_scan_state: { ...state.repos_scan_state, [action.name]: { status: "success", templateCount } },
+      };
+    }
+
+    case "repo-scan-failed":
+      return {
+        ...state,
+        repos_scan_state: { ...state.repos_scan_state, [action.name]: { status: "error", message: action.message } },
+      };
+
       return state;
   }
 }

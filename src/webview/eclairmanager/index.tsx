@@ -9,7 +9,7 @@ import { CommandSection } from "./components/command_section.js";
 import { ReportViewerSection } from "./components/report_viewer.js";
 import { MainAnalysisConfigurationSection } from "./components/main_configuration.js";
 import { match } from "ts-pattern";
-import { EclairScaConfig, EclairScaMainConfig, EclairScaPresetConfig } from "../../utils/eclair/config.js";
+import { EclairRepos, EclairScaConfig, EclairScaMainConfig, EclairScaPresetConfig } from "../../utils/eclair/config.js";
 import { Result } from "../../utils/typing_utils.js";
 
 const BODY_ID = "eclair-manager-body";
@@ -50,6 +50,7 @@ function EclairManagerPanel() {
         analysis_configuration: state.analysis_configuration,
         extra_config: state.extra_config,
         reports: state.reports,
+        repos: state.repos,
       });
       set_collected_config({ ok: config });
     } catch (e) {
@@ -60,6 +61,7 @@ function EclairManagerPanel() {
     state.analysis_configuration,
     state.extra_config,
     state.reports,
+    state.repos,
   ]);
 
   // setup message handler
@@ -180,6 +182,14 @@ function handleMessage(
       dispatch({ type: "load-sca-config", config: msg.config });
       break;
     }
+    case "repo-scan-done": {
+      dispatch({ type: "repo-scan-done", name: msg.name });
+      break;
+    }
+    case "repo-scan-failed": {
+      dispatch({ type: "repo-scan-failed", name: msg.name, message: String(msg.message ?? "") });
+      break;
+    }
   }
 }
 
@@ -188,6 +198,7 @@ function collect_config_from_state(state: {
   analysis_configuration: AnalysisConfigurationState | null,
   extra_config: ExtraConfigState,
   reports: ReportsState,
+  repos: EclairRepos,
 }): EclairScaConfig {
   if (state.analysis_configuration === null) {
     throw new Error("No analysis configuration selected");
@@ -198,6 +209,7 @@ function collect_config_from_state(state: {
     extra_config: state.extra_config.path,
     config: collect_eclair_analysis_config(state.analysis_configuration),
     reports: state.reports.selected,
+    repos: state.repos,
   };
 }
 

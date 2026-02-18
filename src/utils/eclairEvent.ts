@@ -47,6 +47,15 @@ export type ExtensionMessage = {
   // Restore the full saved SCA configuration into the webview
   command: "set-sca-config",
   config: EclairScaConfig,
+} | {
+  /** Sent when the backend begins scanning a repository for preset templates. */
+  command: "repo-scan-done",
+  name: string,
+} | {
+  /** Sent when an entire repository scan fails (e.g. checkout error). */
+  command: "repo-scan-failed",
+  name: string,
+  message: string,
 };
 
 // Commands sent FROM webview frontend TO extension backend
@@ -87,6 +96,28 @@ export type WebviewMessage = {
   command: "load-preset-from-path",
   path: string,
 } | {
+  /**
+   * Ask the backend to load a single preset file from a named repository entry.
+   * The backend looks up origin and rev from EclairScaConfig.repos[name], so
+   * those are NOT repeated here.
+   */
+  command: "load-preset-from-repo",
+  /** Logical repo name — must match a key in EclairScaConfig.repos. */
+  name: string,
+  /** File path relative to the repository root. */
+  path: string,
+} | {
   command: "pick-preset-path",
   kind: EclairTemplateKind,
+} | {
+  /**
+   * Ask the backend to check out a named repository and scan it for preset
+   * templates, sending back `preset-content` messages for each discovered
+   * template.  Used when a new repo is added in the UI so the preset picker
+   * is populated immediately without requiring a full reload.
+   */
+  command: "scan-repo",
+  name: string,
+  origin: string,
+  ref: string,
 };
