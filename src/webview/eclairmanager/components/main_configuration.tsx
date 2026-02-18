@@ -27,7 +27,7 @@ export function MainAnalysisConfigurationSection({
 
       <VscodeRadioGroup
         orientation="vertical"
-        value={state.analysis_configuration?.type || null}
+        value={state.analysis_configuration.type}
         onChange={(e: any) => {
           const type = e.target.value as EclairScaConfigType;
           dispatch_state({ type: "update-configuration-type", configurationType: type });
@@ -40,7 +40,7 @@ export function MainAnalysisConfigurationSection({
         ))}
       </VscodeRadioGroup>
 
-      {configuration?.type === "zephyr-ruleset" && (
+      {configuration.type === "zephyr-ruleset" && (
         <RulesetSection
           ruleset={configuration.ruleset}
           dispatch_state={dispatch_state}
@@ -48,7 +48,7 @@ export function MainAnalysisConfigurationSection({
         />
       )}
 
-      {configuration?.type === "preset" && (
+      {configuration.type === "preset" && (
         <PresetSelection
           state={configuration.state}
           available_presets={state.available_presets}
@@ -59,16 +59,12 @@ export function MainAnalysisConfigurationSection({
         />
       )}
 
-      {configuration?.type === "custom-ecl" && (
+      {configuration.type === "custom-ecl" && (
         <CustomEclSection
           state={configuration.state}
           dispatch_state={dispatch_state}
           post_message={post_message}
         />
-      )}
-
-      {configuration === null && (
-        <div>No configuration selected</div>
       )}
     </div>
   );

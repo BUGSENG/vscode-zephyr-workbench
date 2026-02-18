@@ -9,7 +9,7 @@ export const BUGSENG_REPO_LINK = <a href={BUGSENG_REPO_URL}><code>BUGSENG/zephyr
 export interface EclairState {
   status: StatusState;
   install_path: InstallPathState;
-  analysis_configuration: AnalysisConfigurationState | null;
+  analysis_configuration: AnalysisConfigurationState;
   extra_config: ExtraConfigState;
   reports: ReportsState;
   report_server: ReportServerState;
@@ -34,7 +34,10 @@ export function default_eclair_state(): EclairState {
       disabled: true,
       editing: false,
     },
-    analysis_configuration: null,
+    analysis_configuration: {
+      type: "preset",
+      state: default_presets_selection_state(),
+    },
     extra_config: {
       path: "",
     },

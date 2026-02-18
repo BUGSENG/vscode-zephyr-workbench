@@ -206,15 +206,11 @@ function handleMessage(
 
 function collect_config_from_state(state: {
   install_path: InstallPathState,
-  analysis_configuration: AnalysisConfigurationState | null,
+  analysis_configuration: AnalysisConfigurationState,
   extra_config: ExtraConfigState,
   reports: ReportsState,
   repos: EclairRepos,
 }): EclairScaConfig {
-  if (state.analysis_configuration === null) {
-    throw new Error("No analysis configuration selected");
-  }
-
   return {
     install_path: state.install_path.path,
     extra_config: state.extra_config.path,

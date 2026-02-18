@@ -16,6 +16,7 @@ export function CommandSection({
 }) {
   return (
     <div className="section">
+      <h2>Analysis</h2>
       {"err" in config ? (
         <VscodeAlert type="warning">
           <strong>Invalid configuration:</strong> {config.err}
