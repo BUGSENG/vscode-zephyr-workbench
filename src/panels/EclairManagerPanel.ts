@@ -14,6 +14,9 @@ import { extract_yaml_from_ecl_content, parse_eclair_template_from_any } from ".
 import { EclairPresetTemplateSource, EclairScaConfig } from "../utils/eclair/config";
 import { build_cmake_args } from "./EclairManagerPanel/eclair_cmake_args";
 import { ensureRepoCheckout } from "./EclairManagerPanel/repo_manage";
+import { Result } from "../utils/typing_utils";
+import { EclairTemplate } from "../utils/eclair/template";
+import { match } from "ts-pattern";
 
 export class EclairManagerPanel {
   /**
@@ -606,60 +609,46 @@ export class EclairManagerPanel {
    * This is the main bridge between UI actions and backend logic.
    */
   private _setWebviewMessageListener(webview: vscode.Webview) {
-    const post_message = (m: ExtensionMessage) => this._panel.webview.postMessage(m);
+    function open_link(url: string) {
+      vscode.env.openExternal(vscode.Uri.parse(url));
+    }
 
     webview.onDidReceiveMessage(async (m: WebviewMessage) => {
-      switch (m.command) {
-        case "update-path": {
-          const { tool, newPath } = m;
+      match(m)
+        .with({ command: "update-path" }, ({ tool, newPath }) => {
           if (tool === "eclair") {
             this.saveEclairPathToEnv(newPath);
             const eclairInfo = this.getEclairPathFromEnv();
             const path = eclairInfo?.path || "";
             // TODO post_message({ command: "path-updated", tool, path, success: true });
           }
-          break;
-        }
-        case "browse-path": {
-          const { tool } = m;
-          if (tool === "eclair") {
-            const pick = await vscode.window.showOpenDialog({ canSelectFiles: false, canSelectFolders: true, canSelectMany: false, title: "Select the ECLAIR installation" });
-            if (pick && pick[0]) {
-              const chosen = pick[0].fsPath.trim();
-              this.saveEclairPathToEnv(chosen);
-              const eclairInfo = this.getEclairPathFromEnv();
-              const path = eclairInfo?.path || "";
-              // TODO post_message({ command: "path-updated", tool, path, success: true, FromBrowse: true });
-            }
+        })
+        .with({ command: "browse-path" }, async ({ tool }) => {
+          if (tool !== "eclair") {
+            return;
           }
-          break;
-        }
-        case "manage-license":
-          vscode.env.openExternal(vscode.Uri.parse("http://localhost:1947"));
-          break;
-        case "request-trial":
-          vscode.env.openExternal(vscode.Uri.parse("https://www.bugseng.com/eclair-request-trial/"));
-          break;
-        case "about-eclair":
-          vscode.env.openExternal(vscode.Uri.parse("https://www.bugseng.com/eclair-static-analysis-tool/"));
-          break;
-        case "refresh-status": {
-          try {
-            post_message({ command: "toggle-spinner", show: true });
-            await this.runEclair();
-            const eclairInfo = this.getEclairPathFromEnv();
-            const path = eclairInfo?.path || "";
-            post_message({ command: "set-install-path", path });
-            post_message({ command: "set-path-status", text: path });
-            post_message({ command: "set-install-path-placeholder", text: path });
-          } finally {
-            post_message({ command: "toggle-spinner", show: false });
+
+          const pick = await vscode.window.showOpenDialog({
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false,
+            title: "Select the ECLAIR installation",
+          });
+          if (!pick || !pick[0]) {
+            return;
           }
-          // Webview is now mounted and ready — restore the full saved SCA config
-          await this.loadScaConfig();
-          break;
-        }
-        case "browse-extra-config": {
+
+          const chosen = pick[0].fsPath.trim();
+          this.saveEclairPathToEnv(chosen);
+          const eclairInfo = this.getEclairPathFromEnv();
+          const path = eclairInfo?.path || "";
+          // TODO post_message({ command: "path-updated", tool, path, success: true, FromBrowse: true });
+        })
+        .with({ command: "manage-license" }, () => open_link("http://localhost:1947"))
+        .with({ command: "request-trial" }, () => open_link("https://www.bugseng.com/eclair-request-trial/"))
+        .with({ command: "about-eclair" }, () => open_link("https://www.bugseng.com/eclair-static-analysis-tool/"))
+        .with({ command: "refresh-status" }, async () => this.refresh_status())
+        .with({ command: "browse-extra-config" }, async () => {
           const folderUri = this.resolveApplicationFolderUri();
           const pick = await vscode.window.showOpenDialog({
             canSelectFiles: true,
@@ -674,18 +663,13 @@ export class EclairManagerPanel {
           });
           if (pick?.[0]) {
             const chosen = pick[0].fsPath;
-            post_message({ command: "set-extra-config", path: chosen });
+            this.post_message({ command: "set-extra-config", path: chosen });
           }
-          break;
-        }
-
-        case "save-sca-config": {
-          const cfg = m.config;
+        })
+        .with({ command: "save-sca-config" }, async ({ config: cfg }) => {
           await this.saveScaConfig(cfg);
-          break;
-        }
-        case "run-command": {
-          const cfg = m.config;
+        })
+        .with({ command: "run-command" }, async ({ config: cfg }) => {
           await this.saveScaConfig(cfg);
 
           // Determine application directory
@@ -694,7 +678,7 @@ export class EclairManagerPanel {
 
           if (!appDir) {
             vscode.window.showErrorMessage("Unable to determine application directory for west build.");
-            break;
+            return;
           }
 
           // Determine folder URI for configuration
@@ -713,7 +697,7 @@ export class EclairManagerPanel {
             vscode.window.showErrorMessage(
               "BOARD not set. Please set it before running ECLAIR analysis."
             );
-            break;
+            return;
           }
 
           const buildDir = this.getBuildDir(configs, idx, appDir);
@@ -738,7 +722,7 @@ export class EclairManagerPanel {
           
           if (!westTopdir) {
             vscode.window.showErrorMessage("West workspace not found.");
-            break;
+            return;
           }
 
           // Determine extra paths for environment
@@ -815,13 +799,9 @@ export class EclairManagerPanel {
           } catch (err: any) {
             vscode.window.showErrorMessage(`Failed to run ECLAIR: ${err}`);
           }*/
-          break;
-        }
-
-        case "probe-eclair":
-          this.runEclair();
-          break;
-        case "browse-user-ruleset-path": {
+        })
+        .with({ command: "probe-eclair" }, () => this.runEclair())
+        .with({ command: "browse-user-ruleset-path" }, async () => {
           const pick = await vscode.window.showOpenDialog({
             canSelectFiles: false,
             canSelectFolders: true,
@@ -830,10 +810,10 @@ export class EclairManagerPanel {
           });
           if (pick && pick[0]) {
             const chosen = pick[0].fsPath.trim();
-            post_message({ command: "set-user-ruleset-path", path: chosen });
+            this.post_message({ command: "set-user-ruleset-path", path: chosen });
             // save path select from the browse dialog
             const folderUri = this.resolveApplicationFolderUri();
-            if (!folderUri) break;
+            if (!folderUri) return;
             const config = vscode.workspace.getConfiguration(undefined, folderUri);
             const configs = config.get<any[]>("zephyr-workbench.build.configurations") ?? [];
             const activeIdx = configs.findIndex(c => c?.active === true || c?.active === "true");
@@ -843,9 +823,8 @@ export class EclairManagerPanel {
               await config.update("zephyr-workbench.build.configurations", configs, vscode.ConfigurationTarget.WorkspaceFolder);
             }
           }
-          break;
-        }
-        case "browse-custom-ecl-path": {
+        })
+        .with({ command: "browse-custom-ecl-path" }, async () => {
           const folderUri = this.resolveApplicationFolderUri();
           const pick = await vscode.window.showOpenDialog({
             canSelectFiles: true,
@@ -860,23 +839,15 @@ export class EclairManagerPanel {
           });
           if (pick && pick[0]) {
             const chosen = pick[0].fsPath.trim();
-            post_message({ command: "set-custom-ecl-path", path: chosen });
+            this.post_message({ command: "set-custom-ecl-path", path: chosen });
           }
-          break;
-        }
-        case "start-report-server": {
-          await this.startReportServer();
-          break;
-        }
-        case "stop-report-server": {
-          await this.stopReportServer();
-          break;
-        }
-        case "load-preset-from-path": {
-          load_preset_from_path(m.path, post_message);
-          break;
-        }
-        case "load-preset-from-repo": {
+        })
+        .with({ command: "start-report-server" }, async () => this.startReportServer())
+        .with({ command: "stop-report-server" }, async () => this.stopReportServer())
+        .with({ command: "load-preset-from-path" }, ({ path: presetPath }) => {
+          load_preset_from_path_and_notify(presetPath, this.post_message.bind(this));
+        })
+        .with({ command: "load-preset-from-repo" }, async ({ name, path: repoPath }) => {
           // Look up origin & ref from the stored config — the webview only knows
           // the logical name and the relative file path.
           const folderUri = this.resolveApplicationFolderUri();
@@ -886,22 +857,20 @@ export class EclairManagerPanel {
           const cfgIdx = activeIdx2 >= 0 ? activeIdx2 : 0;
           const scaCfgRaw = wsCfgs[cfgIdx]?.sca?.[0]?.cfg;
           const repos = (scaCfgRaw?.repos ?? {}) as Record<string, { origin: string; ref: string }>;
-          const entry = repos[m.name];
+          const entry = repos[name];
           if (!entry) {
-            const src: EclairPresetTemplateSource = { type: "repo-path", repo: m.name, path: m.path };
-            post_message({ command: "preset-content", source: src, template: { error: `Repository '${m.name}' not found in repos configuration.` } });
-            break;
+            const src: EclairPresetTemplateSource = { type: "repo-path", repo: name, path: repoPath };
+            this.post_message({ command: "preset-content", source: src, template: { error: `Repository '${name}' not found in repos configuration.` } });
+            return;
           }
-          load_preset_from_repo(m.name, entry.origin, entry.ref, m.path, post_message);
-          break;
-        }
-        case "scan-repo": {
+          load_preset_from_repo(name, entry.origin, entry.ref, repoPath, this.post_message.bind(this));
+        })
+        .with({ command: "scan-repo" }, ({ name, origin, ref }) => {
           // Immediately check out the repo and scan all .ecl files, sending
           // back preset-content messages so the webview picker is updated.
-          scanAllRepoPresets(m.name, m.origin, m.ref, post_message);
-          break;
-        }
-        case "pick-preset-path": {          const kind = m.kind;
+          scanAllRepoPresets(name, origin, ref, this.post_message.bind(this));
+        })
+        .with({ command: "pick-preset-path" }, async ({ kind }) => {
           const pick = await vscode.window.showOpenDialog({
             canSelectFiles: true,
             canSelectFolders: false,
@@ -914,11 +883,10 @@ export class EclairManagerPanel {
           });
           if (pick && pick[0]) {
             const chosen = pick[0].fsPath.trim();
-            post_message({ command: "template-path-picked", kind, path: chosen });
+            this.post_message({ command: "template-path-picked", kind, path: chosen });
           }
-          break;
-        }
-      }
+        })
+        .exhaustive();
     }, undefined, this._disposables);
   }
 
@@ -968,7 +936,7 @@ export class EclairManagerPanel {
         const allPresets = [ruleset, ...variants, ...tailorings];
         for (const p of allPresets) {
           if (p?.source?.type === "system-path" && p.source.path) {
-            load_preset_from_path(p.source.path, post_message);
+            load_preset_from_path_and_notify(p.source.path, post_message);
           }
         }
       }
@@ -1138,52 +1106,82 @@ export class EclairManagerPanel {
 </body>
 </html>`;
   }
+
+  async refresh_status() {
+    try {
+      this.post_message({ command: "toggle-spinner", show: true });
+      await this.runEclair();
+      const eclairInfo = this.getEclairPathFromEnv();
+      const path = eclairInfo?.path || "";
+      this.post_message({ command: "set-install-path", path });
+      this.post_message({ command: "set-path-status", text: path });
+      this.post_message({ command: "set-install-path-placeholder", text: path });
+    } finally {
+      this.post_message({ command: "toggle-spinner", show: false });
+    }
+    // Webview is now mounted and ready — restore the full saved SCA config
+    await this.loadScaConfig();
+  }
+
+  post_message(m: ExtensionMessage) {
+    this._panel.webview.postMessage(m);
+  }
 }
 
-async function load_preset_from_path(
+async function load_preset_from_path_and_notify(
   preset_path: string,
   post_message: (m: ExtensionMessage) => void,
 ) {
+  let r = await load_preset_from_path(preset_path, (message) => {
+    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { loading: message } });
+  });
+
+  if ("err" in r) {
+    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { error: r.err } });
+  } else {
+    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: r.ok });
+  }
+}
+
+export async function load_preset_from_path(
+  preset_path: string,
+  on_progress: (message: string) => void,
+): Promise<Result<EclairTemplate, string>> {
   preset_path = preset_path.trim();
   if (!preset_path) {
-    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { error: "Invalid preset path." } });
-    return;
+    return { err: "Invalid preset path." };
   }
 
-  post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { loading: "reading file" } });
+  on_progress("Reading file...");
+  let content: string;
   try {
-    // TODO check and switch on extension
-    const content = await fs.promises.readFile(preset_path, { encoding: "utf8" });
-    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { loading: "parsing file" } });
-
-    const yaml_content = extract_yaml_from_ecl_content(content);
-    if (yaml_content === undefined) {
-      post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { error: "The selected file does not contain valid ECL template content." } });
-      return;
-    }
-
-    let data: any;
-    try {
-      data = yaml.parse(yaml_content);
-    } catch (err: any) {
-      post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { error: `Failed to parse preset: ${err?.message || err}` } });
-      return;
-    }
-
-    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { loading: "validating file" } });
-
-    let template: any;
-    try {
-      template = parse_eclair_template_from_any(data);
-    } catch (err: any) {
-      post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { error: `Invalid preset content: ${err?.message || err}` } });
-      return;
-    }
-
-    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template });
+    content = await fs.promises.readFile(preset_path, { encoding: "utf8" });
   } catch (err: any) {
-    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { error: `Failed to read preset: ${err?.message || err}` } });
+    return { err: `Failed to read preset: ${err?.message || err}` };
   }
+
+  on_progress("Parsing file...");
+  const yaml_content = extract_yaml_from_ecl_content(content);
+  if (yaml_content === undefined) {
+    return { err: "The selected file does not contain valid ECL template content." };
+  }
+
+  let data: any;
+  try {
+    data = yaml.parse(yaml_content);
+  } catch (err: any) {
+    return { err: `Failed to parse preset: ${err?.message || err}` };
+  }
+
+  on_progress("Validating file...");
+  let template: EclairTemplate;
+  try {
+    template = parse_eclair_template_from_any(data);
+  } catch (err: any) {
+    return { err: `Invalid preset content: ${err?.message || err}` };
+  }
+
+  return { ok: template };
 }
 
 /**

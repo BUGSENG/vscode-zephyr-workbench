@@ -4,6 +4,9 @@ import { accessSync } from "fs";
 import fs from "fs";
 import os from "os";
 import { match } from "ts-pattern";
+import { EclairTemplate } from "../../utils/eclair/template";
+import { format_flag_settings } from "../../utils/eclair/template_utils";
+import { SinglePresetSelectionState } from "../../webview/eclairmanager/state";
 
 export function build_cmake_args(cfg: EclairScaConfig): string[] {
   const parts: string[] = [];
@@ -73,7 +76,14 @@ export function build_cmake_args(cfg: EclairScaConfig): string[] {
         // .ecl file needs a wrapper that uses -eval_file
         const wrapperPath = path.join(os.tmpdir(), "eclair_wrapper.cmake");
 
-        const content = `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "-eval_file=${filePath}")\n`;
+        let content = "";
+
+        for (const opt of additional_eclair_options) {
+          const escaped_opt = opt.replace(/"/g, '\\"');
+          content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "${escaped_opt}")\n`;
+        }
+
+        content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "-eval_file=${filePath}")\n`;
         fs.writeFileSync(wrapperPath, content, { encoding: "utf8" });
         finalPath = wrapperPath.replace(/\\/g, "/");
       }
@@ -114,4 +124,11 @@ function handle_zephyr_ruleset_config(parts: string[], cfg: EclairScaZephyrRules
   return [];
 }
 
-
+function build_cmake_additional_eclair_options_commands(eclair_options: string[]): string[] {
+  const commands: string[] = [];
+  for (const opt of eclair_options) {
+    const escaped_opt = opt.replace(/"/g, '\\"');
+    commands.push(`list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "${escaped_opt}")`);
+  }
+  return commands;
+}
