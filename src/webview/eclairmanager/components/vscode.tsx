@@ -130,16 +130,46 @@ export function SimpleTooltip(props: {
 }
 
 export function RichTooltip(props: {
-  label?: string;
   children: React.ReactNode;
   style?: React.CSSProperties;
 }) {
+  const [visible, setVisible] = useState(false);
+  const hideTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const show = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (!visible) {
+      showTimer.current = setTimeout(() => setVisible(true), 400);
+    }
+  };
+
+  const hide = () => {
+    if (showTimer.current) clearTimeout(showTimer.current);
+    hideTimer.current = setTimeout(() => setVisible(false), 200);
+  };
+
   return (
-    <span className="rich-tooltip" style={{ marginLeft: "8px", ...props.style }}>
-      <span className="rich-tooltip-icon" aria-hidden="true">
-        {props.label ?? "?"}
-      </span>
-      <span className="rich-tooltip-content" role="tooltip">
+    <span
+      className="rich-tooltip"
+      style={{ marginLeft: "8px", ...props.style }}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+    >
+      <span className="rich-tooltip-icon" aria-hidden="true">?</span>
+      <span
+        className={"rich-tooltip-content" + (visible ? " rich-tooltip-content--visible" : "")}
+        role="tooltip"
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        style={{
+          fontWeight: "normal",
+          textAlign: "left",
+          textJustify: "inter-word",
+        }}
+      >
         {props.children}
       </span>
     </span>

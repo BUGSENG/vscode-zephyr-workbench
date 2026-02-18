@@ -496,12 +496,6 @@ vscode-button {
 
 .rich-tooltip {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  cursor: help;
-}
-
-.rich-tooltip-icon {
   background: rgba(0,0,0,0.3);
   display: inline-block;
   width: 14px;
@@ -509,36 +503,43 @@ vscode-button {
   line-height: 14px;
   text-align: center;
   border-radius: 50%;
-  /*border: 1px solid var(--vscode-editor-foreground);
-  color: var(--vscode-editor-foreground);*/
-  border: 1px solid var(--vscode-textLink-foreground);
-  color: var(--vscode-textLink-foreground, #0094ff);
-  font-size: 12px;
+  padding: 0;
+  border: 1px solid var(--vscode-editor-foreground);
+}
+
+.rich-tooltip-icon {
+  cursor: help;
+  color: var(--vscode-editor-foreground);
 }
 
 .rich-tooltip-content {
   position: absolute;
-  top: -40px;
+  top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
   width: 280px;
   max-width: 90vw;
   border-radius: 6px;
-  background: rgba(0,0,0,0.9);
-  color: #fff;
+  /*background: rgba(0,0,0,0.9);
+  color: #fff;*/
+  background: var(--vscode-editorHoverWidget-background);
+  color: var(--vscode-editorHoverWidget-foreground);
+  border: 1px solid var(--vscode-editorHoverWidget-border);
   padding: 8px 10px;
   z-index: 1000;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.5s ease;
   box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  font-size: 13px;
 }
 
-.rich-tooltip:hover .rich-tooltip-content,
-.rich-tooltip:focus-within .rich-tooltip-content {
+.rich-tooltip-content--visible {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.5s ease;
 }
 
 @media screen and (max-width: 400px) {
@@ -605,6 +606,7 @@ vscode-button {
 .no-icon-tooltip:hover::after {
   opacity: 1;
   visibility: visible;
+  transition: opacity 0.25s ease 0.4s;
 }
 
 .no-icon-tooltip[data-tooltip]:hover::after {
