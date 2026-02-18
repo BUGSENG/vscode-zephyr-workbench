@@ -1686,6 +1686,7 @@
     "@types/react-dom": "^19.2.3",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "7zip-bin": "^5.2.0",
+    "immer": "^11.1.4",
     "JSON": "^1.0.0",
     "node-7z": "^3.0.0",
     "react": "^19.2.4",

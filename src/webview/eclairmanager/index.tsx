@@ -12,6 +12,7 @@ import { match } from "ts-pattern";
 import { EclairRepos, EclairScaConfig, EclairScaMainConfig, EclairScaPresetConfig } from "../../utils/eclair/config.js";
 import { Result } from "../../utils/typing_utils.js";
 import { RichHelpTooltip } from "./components/vscode.js";
+import { enableMapSet } from "immer";
 
 const BODY_ID = "eclair-manager-body";
 
@@ -22,6 +23,8 @@ export async function main() {
   const mod = await import("@vscode/webview-ui-toolkit");
   const { provideVSCodeDesignSystem, allComponents } = mod as any;
   provideVSCodeDesignSystem().register(allComponents);
+
+  enableMapSet();
 
   const body = document.getElementById(BODY_ID);
   if (!body) return;
