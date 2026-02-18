@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
-import { AvailablePresetsState, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetsSelectionState, RepoScanState, SinglePresetSelectionState } from "../../state";
-import { PickPath, SearchableDropdown, SearchableItem, StatusBadge, StatusBadgeState, VscodeAlert, VscodeButton, VscodeCheckbox, VscodePanel, SimpleTooltip, RichTooltip, VscodeTextField } from "../vscode";
+import { AvailablePresetsState, BUGSENG_REPO_LINK, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetsSelectionState, RepoScanState, SinglePresetSelectionState } from "../../state";
+import { PickPath, SearchableDropdown, SearchableItem, StatusBadge, StatusBadgeState, VscodeAlert, VscodeButton, VscodeCheckbox, VscodePanel, SimpleHelpTooltip, RichHelpTooltip, VscodeTextField } from "../vscode";
 import { EclairTemplate, EclairTemplateKind, EclairTemplateOption } from "../../../../utils/eclair/template";
 import { EclairPresetTemplateSource, EclairRepos, PresetSelectionState } from "../../../../utils/eclair/config";
 import { RepoManagementSection } from "./preset_selection/repo_management";
@@ -17,18 +17,17 @@ export function PresetSelection(props: {
   return (<>
     <h3>
       Repository management
-      <SimpleTooltip text="Manage Git repositories that provide preset templates" />
-      <RichTooltip>
-        <div style={{ fontWeight: 600, marginBottom: "4px" }}>Preset repositories</div>
-        <div style={{ fontSize: "0.9em" }}>
-          Preset templates can be sourced from Git repositories. Use the form below to add, edit, or remove repositories. Each repository is identified by a name, a Git origin URL, and a revision (branch, tag, or commit SHA). Repositories are checked out on demand and scanned for preset templates.
-        </div>
-      </RichTooltip>
-      <RichTooltip>
-        Manage the Git repositories that provide preset templates. Each repository
-        is identified by a short name, a Git origin URL, and a revision (branch,
-          tag, or commit SHA).
-      </RichTooltip>
+      <RichHelpTooltip>
+        <p>
+          Manage the Git repositories that provide preset templates. Each repository is identified by a short name, a Git origin URL, and a revision (branch, tag, or commit SHA).
+        </p>
+        <p>
+          Repositories are checked out on demand and scanned for preset templates.
+        </p>
+        <p>
+          A reference repository with curated preset is available at {BUGSENG_REPO_LINK}.
+        </p>
+      </RichHelpTooltip>
     </h3>
     <RepoManagementSection
       repos={props.repos}
@@ -40,14 +39,14 @@ export function PresetSelection(props: {
 
     <h3>
       Ruleset selection
-      <SimpleTooltip text="Select a base ruleset that defines the default set of checks for the analysis." />
-      <RichTooltip>
+      <SimpleHelpTooltip text="Select a base ruleset that defines the default set of checks for the analysis." />
+      <RichHelpTooltip>
         <div style={{ fontWeight: 600, marginBottom: "4px" }}>Ruleset info</div>
         <div style={{ fontSize: "0.9em" }}>
           Use a ruleset as the baseline for checks. Variants and tailorings can
           refine this selection.
         </div>
-      </RichTooltip>
+      </RichHelpTooltip>
     </h3>
     Choose a base ruleset to run the analysis with.
 

@@ -1,7 +1,10 @@
+import React from "react";
 import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig, PresetSelectionState } from "../../utils/eclair/config";
 import { EclairTemplate, EclairTemplateKind } from "../../utils/eclair/template";
 
-const default_install_path_placeholder = "Enter the tool's path if not in the global PATH";
+const DEFAULT_INSTALL_PATH_PLACEHOLDER = "Enter the tool's path if not in the global PATH";
+const BUGSENG_REPO_URL = "https://github.com/BUGSENG/zephyr-workbench-eclair-presets";
+export const BUGSENG_REPO_LINK = <a href={BUGSENG_REPO_URL}><code>BUGSENG/zephyr-workbench-eclair-presets</code></a>;
 
 export interface EclairState {
   status: StatusState;
@@ -27,7 +30,7 @@ export function default_eclair_state(): EclairState {
     },
     install_path: {
       path: "",
-      placeholder: default_install_path_placeholder,
+      placeholder: DEFAULT_INSTALL_PATH_PLACEHOLDER,
       disabled: true,
       editing: false,
     },
@@ -41,7 +44,12 @@ export function default_eclair_state(): EclairState {
     report_server: {
       running: false,
     },
-    repos: {},
+    repos: {
+      "BUGSENG presets": {
+        origin: BUGSENG_REPO_URL,
+        ref: "main",
+      },
+    },
     repos_scan_state: {},
     available_presets: {
       by_path: new Map(),
@@ -457,7 +465,7 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
         ...state,
         install_path: {
           path: action.path,
-          placeholder: action.path ? "" : default_install_path_placeholder,
+          placeholder: action.path ? "" : DEFAULT_INSTALL_PATH_PLACEHOLDER,
           disabled: false,
           editing: false,
         },
@@ -475,7 +483,7 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
         install_path: action.text.trim().toLowerCase() === "checking"
           ? { path: "", placeholder: "Checking", disabled: true, editing: false }
           : action.text.trim() === ""
-            ? { ...state.install_path, path: "", placeholder: default_install_path_placeholder, disabled: true }
+            ? { ...state.install_path, path: "", placeholder: DEFAULT_INSTALL_PATH_PLACEHOLDER, disabled: true }
             : { ...state.install_path, path: action.text, placeholder: "", disabled: true },
       };
     

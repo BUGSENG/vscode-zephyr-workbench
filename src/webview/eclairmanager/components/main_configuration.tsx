@@ -1,7 +1,7 @@
 import React, { JSX } from "react";
 import { WebviewMessage } from "../../../utils/eclairEvent";
-import { EclairState, EclairStateAction, ZephyrRulesetState } from "../state";
-import { RichTooltip, VscodeRadio, VscodeRadioGroup } from "./vscode";
+import { BUGSENG_REPO_LINK, EclairState, EclairStateAction, ZephyrRulesetState } from "../state";
+import { RichHelpTooltip, VscodeRadio, VscodeRadioGroup } from "./vscode";
 import { RulesetSection } from "./main_configuration/ruleset_section";
 import { CustomEclSection } from "./main_configuration/custom_ecl";
 import { PresetSelection } from "./main_configuration/preset_selection";
@@ -80,7 +80,7 @@ const ZEPHYR_CODING_GUIDELINES_URL = "https://docs.zephyrproject.org/latest/cont
 const RULESET_DESCRIPTION: Record<EclairScaConfigType, JSX.Element> = {
   "preset": <>
     Use a preset configuration based on rulesets, variants and tailorings
-    <RichTooltip>
+    <RichHelpTooltip>
       <p>
         Allows to use a combination of <b>rulesets</b>, <b>variants</b>, and <b>tailorings</b> from a set of templates.
       </p>
@@ -94,24 +94,24 @@ const RULESET_DESCRIPTION: Record<EclairScaConfigType, JSX.Element> = {
         See also:
       </p>
       <ul>
-        <li><a href="https://github.com/BUGSENG/zephyr-workbench-eclair-presets"><code>BUGSENG/zephyr-workbench-eclair-presets</code></a>: the reference repository for Eclair SCA presets for Zephyr projects, maintained by BUGSENG</li>
+        <li>{BUGSENG_REPO_LINK}: the reference repository for Eclair SCA presets for Zephyr projects, maintained by BUGSENG</li>
       </ul>
-    </RichTooltip>
+    </RichHelpTooltip>
   </>,
   "custom-ecl": <>
     Provide a custom ECL (<code>.ecl</code>) file
-    <RichTooltip>
+    <RichHelpTooltip>
       <p>
         Allows to use a custom ECL file as the analysis configuration. The ECL file must be provided by the user and follow the expected format for Eclair SCA analysis configurations.
       </p>
       <p>
         This option is useful when you already have a valid configuration for your project that you want to reuse with this interface
       </p>
-    </RichTooltip>
+    </RichHelpTooltip>
   </>,
   "zephyr-ruleset": <>
     Use a builtin Zephyr ruleset
-    <RichTooltip>
+    <RichHelpTooltip>
       <p>
         Zephyr supports an upstream <a href={ZEPHYR_ECLAIR_URL}>integration</a> with ECLAIR.
       </p>
@@ -125,6 +125,6 @@ const RULESET_DESCRIPTION: Record<EclairScaConfigType, JSX.Element> = {
         <li><a href={ZEPHYR_ECLAIR_URL}>Zephyr ECLAIR Support</a></li>
         <li><a href={ZEPHYR_CODING_GUIDELINES_URL}>Zephyr Coding Guidelines</a></li>
       </ul>
-    </RichTooltip>
+    </RichHelpTooltip>
   </>,
 };

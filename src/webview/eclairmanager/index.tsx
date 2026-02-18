@@ -11,6 +11,7 @@ import { MainAnalysisConfigurationSection } from "./components/main_configuratio
 import { match } from "ts-pattern";
 import { EclairRepos, EclairScaConfig, EclairScaMainConfig, EclairScaPresetConfig } from "../../utils/eclair/config.js";
 import { Result } from "../../utils/typing_utils.js";
+import { RichHelpTooltip } from "./components/vscode.js";
 
 const BODY_ID = "eclair-manager-body";
 
@@ -82,7 +83,17 @@ function EclairManagerPanel() {
 
   return (
     <div>
-      <h1>ECLAIR Manager</h1>
+      <h1>
+        ECLAIR Manager
+        <RichHelpTooltip>
+          <p>
+            Bugseng <a href="https://www.bugseng.com/eclair-static-analysis-tool/">ECLAIR</a> is a certified static analysis tool and platform for software verification.
+          </p>
+          <p>
+            This panel allows to configure ECLAIR SCA analysis for Zephyr projects.
+          </p>
+        </RichHelpTooltip>
+      </h1>
 
       <Summary
         status={state.status}

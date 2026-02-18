@@ -496,20 +496,7 @@ vscode-button {
 
 .rich-tooltip {
   position: relative;
-  background: rgba(0,0,0,0.3);
   display: inline-block;
-  width: 14px;
-  height: 14px;
-  line-height: 14px;
-  text-align: center;
-  border-radius: 50%;
-  padding: 0;
-  border: 1px solid var(--vscode-editor-foreground);
-}
-
-.rich-tooltip-icon {
-  cursor: help;
-  color: var(--vscode-editor-foreground);
 }
 
 .rich-tooltip-content {
@@ -520,8 +507,6 @@ vscode-button {
   width: 280px;
   max-width: 90vw;
   border-radius: 6px;
-  /*background: rgba(0,0,0,0.9);
-  color: #fff;*/
   background: var(--vscode-editorHoverWidget-background);
   color: var(--vscode-editorHoverWidget-foreground);
   border: 1px solid var(--vscode-editorHoverWidget-border);

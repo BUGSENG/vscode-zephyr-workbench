@@ -150,16 +150,16 @@ export function StatusBadge({ status }: { status: StatusBadgeState }) {
         <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.85em", color: "var(--vscode-errorForeground)" }}>
           <span className="codicon codicon-error" aria-hidden="true" />
           {label}
-          <RichTooltip
+          <RichHelpTooltip
             style={{ marginLeft: "2px", color: "var(--vscode-errorForeground)", fontSize: "0.9em" }}
-          >{status.message}</RichTooltip>
+          >{status.message}</RichHelpTooltip>
         </span>
       );
     }
   }
 }
 
-export function SimpleTooltip(props: {
+export function SimpleHelpTooltip(props: {
   text: string;
   label?: string;
   style?: React.CSSProperties;
@@ -175,7 +175,7 @@ export function SimpleTooltip(props: {
   );
 }
 
-export function RichTooltip(props: {
+export function RichHelpTooltip(props: {
   children: React.ReactNode;
   style?: React.CSSProperties;
 }) {
@@ -204,7 +204,11 @@ export function RichTooltip(props: {
       onFocus={show}
       onBlur={hide}
     >
-      <span className="rich-tooltip-icon" aria-hidden="true">?</span>
+      <span
+        className="codicon codicon-question"
+        aria-hidden="true"
+        style={{ fontSize: "20px", display: "inline-block", verticalAlign: "middle", lineHeight: 1 }}
+      />
       <span
         className={"rich-tooltip-content" + (visible ? " rich-tooltip-content--visible" : "")}
         role="tooltip"
