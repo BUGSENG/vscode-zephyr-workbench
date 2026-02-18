@@ -7,7 +7,6 @@ export function RulesetSection(props: {
   ruleset: ZephyrRulesetState;
   dispatch_state: React.Dispatch<EclairStateAction>;
   post_message: (message: WebviewMessage) => void;
-  collectConfig: () => any;
 }) {
   const rulesets = [
     "ECLAIR_RULESET_FIRST_ANALYSIS",
@@ -22,17 +21,7 @@ export function RulesetSection(props: {
   const showUserFields = props.ruleset.selected === "USER";
 
   const handleUserRulesetNameEdit = () => {
-    if (props.ruleset.userRulesetNameEditing) {
-      props.post_message({ command: "save-sca-config", data: props.collectConfig() });
-    }
     props.dispatch_state({ type: "toggle-user-ruleset-name-editing" });
-  };
-
-  const handleUserRulesetPathEdit = () => {
-    if (props.ruleset.userRulesetPathEditing) {
-      props.post_message({ command: "save-sca-config", data: props.collectConfig() });
-    }
-    props.dispatch_state({ type: "toggle-user-ruleset-path-editing" });
   };
 
   return (

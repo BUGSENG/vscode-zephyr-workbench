@@ -87,12 +87,3 @@ export type EclairTemplateCondition = {
   prefix: string;
 };
 
-export type EclairPresetTemplateSource = {
-  type: "system-path",
-  path: string;
-} | {
-  type: "repo-rev-path",
-  repo: string;
-  rev: string;
-  path: string;
-};

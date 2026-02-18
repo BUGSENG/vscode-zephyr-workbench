@@ -11,12 +11,10 @@ export function MainAnalysisConfigurationSection({
   state,
   dispatch_state,
   post_message,
-  collectConfig,
 }: {
   state: EclairState;
   dispatch_state: React.Dispatch<EclairStateAction>;
   post_message: (message: WebviewMessage) => void;
-  collectConfig: () => any;
 }) {
   const rulesets = ["preset", "custom-ecl", "zephyr-ruleset"];
   const ruleset_description = {
@@ -51,7 +49,6 @@ export function MainAnalysisConfigurationSection({
           ruleset={configuration.ruleset}
           dispatch_state={dispatch_state}
           post_message={post_message}
-          collectConfig={collectConfig}
         />
       )}
 

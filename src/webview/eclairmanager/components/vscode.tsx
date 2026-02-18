@@ -49,6 +49,70 @@ export function VscodePanel(props: {
   );
 }
 
+export function VscodeAlert(props: {
+  type?: "info" | "warning" | "error" | "success";
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  const type = props.type ?? "info";
+  
+  const iconMap = {
+    info: "codicon-info",
+    warning: "codicon-warning",
+    error: "codicon-error",
+    success: "codicon-check"
+  };
+
+  const colorMap = {
+    info: "var(--vscode-notificationsInfoIcon-foreground, #3794ff)",
+    warning: "var(--vscode-notificationsWarningIcon-foreground, #cca700)",
+    error: "var(--vscode-notificationsErrorIcon-foreground, #f48771)",
+    success: "var(--vscode-debugIcon-startForeground, #89d185)"
+  };
+
+  const bgMap = {
+    info: "var(--vscode-inputValidation-infoBackground, rgba(55, 148, 255, 0.15))",
+    warning: "var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.15))",
+    error: "var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.15))",
+    success: "rgba(137, 209, 133, 0.15)"
+  };
+
+  const borderMap = {
+    info: "var(--vscode-inputValidation-infoBorder, rgba(55, 148, 255, 0.62))",
+    warning: "var(--vscode-inputValidation-warningBorder, rgba(204, 167, 0, 0.62))",
+    error: "var(--vscode-inputValidation-errorBorder, rgba(244, 135, 113, 0.62))",
+    success: "rgba(137, 209, 133, 0.62)"
+  };
+
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "flex-start",
+      gap: "10px",
+      //marginBottom: "12px",
+      margin: "12px",
+      padding: "10px 12px",
+      border: `1px solid ${borderMap[type]}`,
+      borderRadius: "4px",
+      backgroundColor: bgMap[type],
+      ...props.style
+    }}>
+      <span 
+        className={`codicon ${iconMap[type]}`} 
+        style={{ 
+          color: colorMap[type],
+          fontSize: "16px",
+          marginTop: "2px",
+          flexShrink: 0
+        }}
+      />
+      <div style={{ flex: 1 }}>
+        {props.children}
+      </div>
+    </div>
+  );
+}
+
 export function SimpleTooltip(props: {
   text: string;
   label?: string;

@@ -698,15 +698,20 @@ export class EclairManagerPanel {
         }
 
         case "save-sca-config": {
-          const cfg: IEclairConfig = m.data || {};
-          await this.saveScaConfig(cfg);
-          if (cfg.extraConfig) {
-            await this.saveExtraConfigToActiveSca(cfg.extraConfig);
-          }
+          // TODO implement this
+          //const cfg: IEclairConfig = m.data || {};
+          //await this.saveScaConfig(cfg);
+          //if (cfg.extraConfig) {
+          //  await this.saveExtraConfigToActiveSca(cfg.extraConfig);
+          //}
+          const config = m.config;
+          // placeholder: just show a message for now
+          vscode.window.showInformationMessage(`Received SCA config from UI: ${JSON.stringify(config)}`);
           break;
         }
         case "run-command": {
-          const cfg: IEclairConfig = m.data || {};
+          vscode.window.showInformationMessage(`Received SCA config from UI: ${JSON.stringify(m.config)}`);
+          /*const cfg: IEclairConfig = m.data || {};
           await this.saveScaConfig(cfg);
 
           // Determine application directory
@@ -833,7 +838,7 @@ export class EclairManagerPanel {
             });
           } catch (err: any) {
             vscode.window.showErrorMessage(`Failed to run ECLAIR: ${err}`);
-          }
+          }*/
           break;
         }
 

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
-import { AvailablePresetsState, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetSelectionState, PresetsSelectionState, SinglePresetSelectionState } from "../../state";
+import { AvailablePresetsState, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetsSelectionState, SinglePresetSelectionState } from "../../state";
 import { PickPath, SearchableDropdown, SearchableItem, VscodeButton, VscodeCheckbox, VscodePanel, SimpleTooltip, RichTooltip } from "../vscode";
-import { EclairPresetTemplateSource, EclairTemplate, EclairTemplateKind, EclairTemplateOption } from "../../../../utils/eclair/template";
+import { EclairTemplate, EclairTemplateKind, EclairTemplateOption } from "../../../../utils/eclair/template";
+import { EclairPresetTemplateSource, PresetSelectionState } from "../../../../utils/eclair/config";
 
 export function PresetSelection(props: {
   state: PresetsSelectionState;

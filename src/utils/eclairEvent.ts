@@ -1,4 +1,5 @@
-import { EclairPresetTemplateSource, EclairTemplate, EclairTemplateKind } from "./eclair/template";
+import { EclairPresetTemplateSource, EclairScaConfig } from "./eclair/config";
+import { EclairTemplate, EclairTemplateKind } from "./eclair/template";
 
 
 // Commands sent FROM extension backend TO webview frontend
@@ -62,24 +63,10 @@ export type WebviewMessage = {
   command: "browse-user-ruleset-path",
 } | {
   command: "save-sca-config",
-  data: {
-    installPath?: string,
-    extraConfig?: string,
-    ruleset?: string,
-    userRulesetName?: string,
-    userRulesetPath?: string,
-    reports?: string[],
-  },
+  config: EclairScaConfig,
 } | {
   command: "run-command",
-  data: {
-    installPath?: string,
-    extraConfig?: string,
-    ruleset?: string,
-    userRulesetName?: string,
-    userRulesetPath?: string,
-    reports?: string[],
-  },
+  config: EclairScaConfig,
 } | {
   command: "start-report-server",
 } | {

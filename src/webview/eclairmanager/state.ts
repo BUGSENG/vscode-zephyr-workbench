@@ -1,4 +1,5 @@
-import { EclairPresetTemplateSource, EclairTemplate, EclairTemplateKind } from "../../utils/eclair/template";
+import { EclairPresetTemplateSource, PresetSelectionState } from "../../utils/eclair/config";
+import { EclairTemplate, EclairTemplateKind } from "../../utils/eclair/template";
 
 const default_install_path_placeholder = "Enter the tool's path if not in the global PATH";
 
@@ -133,11 +134,6 @@ export interface SinglePresetSelectionState {
 export interface MultiPresetSelectionState {
   presets: PresetSelectionState[];
   edit_path: string;
-}
-
-export interface PresetSelectionState {
-  source: EclairPresetTemplateSource;
-  edited_flags: Record<string, boolean>;
 }
 
 export function preset_template_source_id(source: EclairPresetTemplateSource): string {
