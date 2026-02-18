@@ -1653,8 +1653,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "compile": "node ./esbuild.js",
-    "package": "cross-env NODE_ENV=production node ./esbuild.js",
+    "compile": "tsc --noEmit && node ./esbuild.js",
+    "package": "tsc --noEmit && cross-env NODE_ENV=production node ./esbuild.js",
     "watch": "node ./esbuild.js --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
