@@ -142,66 +142,28 @@ function handleMessage(
 ) {
   const msg: ExtensionMessage = event.data;
 
-  switch (msg.command) {
-    case "toggle-spinner":
-      dispatch({ type: "toggle-spinner", show: !!msg.show });
-      break;
-    case "eclair-status":
-      dispatch({
-        type: "set-eclair-status",
-        installed: !!msg.installed,
-        version: msg.installed ? String(msg.version || "").trim() || "Unknown" : "Unknown",
-      });
-      break;
-    case "set-install-path":
-      dispatch({ type: "set-install-path", path: String(msg.path ?? "") });
-      break;
-    case "set-extra-config":
-      dispatch({ type: "set-extra-config", path: String(msg.path ?? "") });
-      break;
-    case "set-path-status":
-      dispatch({ type: "set-path-status", text: String(msg.text ?? "") });
-      break;
-    case "set-user-ruleset-name":
-      dispatch({ type: "set-user-ruleset-name", name: String(msg.name ?? "") });
-      break;
-    case "set-user-ruleset-path":
-      const path = String(msg.path ?? "");
-      dispatch({ type: "set-user-ruleset-path", path });
-      break;
-    case "set-custom-ecl-path":
-      const eclPath = String(msg.path ?? "");
-      dispatch({ type: "set-custom-ecl-path", path: eclPath });
-      break;
-    case "report-server-started":
-      dispatch({ type: "report-server-started" });
-      break;
-    case "report-server-stopped":
-      dispatch({ type: "report-server-stopped" });
-      break;
-    case "preset-content": {
-      const { source, template } = msg;
-      dispatch({ type: "preset-content", source, template });
-      break;
-    }
-    case "template-path-picked": {
-      const { kind, path } = msg;
-      dispatch({ type: "set-preset-path", kind, path });
-      break;
-    }
-    case "set-sca-config": {
-      dispatch({ type: "load-sca-config", config: msg.config });
-      break;
-    }
-    case "repo-scan-done": {
-      dispatch({ type: "repo-scan-done", name: msg.name });
-      break;
-    }
-    case "repo-scan-failed": {
-      dispatch({ type: "repo-scan-failed", name: msg.name, message: String(msg.message ?? "") });
-      break;
-    }
-  }
+  match(msg)
+    .with({ command: "toggle-spinner" }, ({ show }) => dispatch({ type: "toggle-spinner", show: !!show }))
+    .with({ command: "eclair-status" }, ({ installed, version }) => dispatch({
+      type: "set-eclair-status",
+      installed: !!installed,
+      version: installed ? String(version || "").trim() || "Unknown" : "Unknown",
+    }))
+    .with({ command: "set-install-path" }, ({ path }) => dispatch({ type: "set-install-path", path: String(path ?? "") }))
+    .with({ command: "set-install-path-placeholder" }, ({ text }) => dispatch({ type: "set-install-path-placeholder", text: String(text ?? "") }))
+    .with({ command: "set-extra-config" }, ({ path }) => dispatch({ type: "set-extra-config", path: String(path ?? "") }))
+    .with({ command: "set-path-status" }, ({ text }) => dispatch({ type: "set-path-status", text: String(text ?? "") }))
+    .with({ command: "set-user-ruleset-name" }, ({ name }) => dispatch({ type: "set-user-ruleset-name", name: String(name ?? "") }))
+    .with({ command: "set-user-ruleset-path" }, ({ path }) => dispatch({ type: "set-user-ruleset-path", path: String(path ?? "") }))
+    .with({ command: "set-custom-ecl-path" }, ({ path }) => dispatch({ type: "set-custom-ecl-path", path: String(path ?? "") }))
+    .with({ command: "report-server-started" }, () => dispatch({ type: "report-server-started" }))
+    .with({ command: "report-server-stopped" }, () => dispatch({ type: "report-server-stopped" }))
+    .with({ command: "preset-content" }, ({ source, template }) => dispatch({ type: "preset-content", source, template }))
+    .with({ command: "template-path-picked" }, ({ kind, path }) => dispatch({ type: "set-preset-path", kind, path }))
+    .with({ command: "set-sca-config" }, ({ config }) => dispatch({ type: "load-sca-config", config }))
+    .with({ command: "repo-scan-done" }, ({ name }) => dispatch({ type: "repo-scan-done", name }))
+    .with({ command: "repo-scan-failed" }, ({ name, message }) => dispatch({ type: "repo-scan-failed", name, message: String(message ?? "") }))
+    .exhaustive();
 }
 
 function collect_config_from_state(state: {

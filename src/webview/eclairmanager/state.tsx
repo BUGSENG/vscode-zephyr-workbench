@@ -1,6 +1,7 @@
 import React from "react";
 import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig, PresetSelectionState } from "../../utils/eclair/config";
 import { EclairTemplate, EclairTemplateKind } from "../../utils/eclair/template";
+import { match } from "ts-pattern";
 
 const DEFAULT_INSTALL_PATH_PLACEHOLDER = "Enter the tool's path if not in the global PATH";
 const BUGSENG_REPO_URL = "https://github.com/BUGSENG/zephyr-workbench-eclair-presets";
@@ -137,15 +138,10 @@ export interface AvailablePresetsState {
 }
 
 export function get_preset_template_by_source(presets: AvailablePresetsState, source: EclairPresetTemplateSource): EclairTemplate | { loading: string } | { error: string } | undefined {
-  switch (source.type) {
-    case "system-path":
-      return presets.by_path.get(source.path);
-    case "repo-path": {
-      const by_path = presets.by_repo_path.get(source.repo);
-      if (!by_path) return undefined;
-      return by_path.get(source.path);
-    }
-  }
+  return match(source)
+    .with({ type: "system-path" }, ({ path }) => presets.by_path.get(path))
+    .with({ type: "repo-path" }, ({ repo, path }) => presets.by_repo_path.get(repo)?.get(path))
+    .exhaustive();
 }
 
 export interface SinglePresetSelectionState {
@@ -199,6 +195,7 @@ export type EclairStateAction =
   | { type: "toggle-spinner"; show: boolean }
   | { type: "set-eclair-status"; installed: boolean; version: string }
   | { type: "set-install-path"; path: string }
+  | { type: "set-install-path-placeholder"; text: string }
   | { type: "set-extra-config"; path: string }
   | { type: "set-path-status"; text: string }
   | { type: "set-user-ruleset-name"; name: string }
@@ -222,46 +219,43 @@ export type EclairStateAction =
   | { type: "repo-scan-failed"; name: string; message: string };
 
 function build_analysis_configuration_from_config(cfg: EclairScaConfig): AnalysisConfigurationState {
-  switch (cfg.config.type) {
-    case "zephyr-ruleset":
-      return {
-        type: "zephyr-ruleset",
-        ruleset: {
-          selected: cfg.config.ruleset,
-          userRulesetName: cfg.config.userRulesetName ?? "",
-          userRulesetNameEditing: false,
-          userRulesetPath: cfg.config.userRulesetPath ?? "",
-          userRulesetPathEditing: false,
-        },
-      };
-    case "custom-ecl":
-      return {
-        type: "custom-ecl",
-        state: { ecl: cfg.config.ecl_path },
-      };
-    case "preset": {
+  return match(cfg.config)
+    .with({ type: "zephyr-ruleset" }, (c) => ({
+      type: "zephyr-ruleset" as const,
+      ruleset: {
+        selected: c.ruleset,
+        userRulesetName: c.userRulesetName ?? "",
+        userRulesetNameEditing: false,
+        userRulesetPath: c.userRulesetPath ?? "",
+        userRulesetPathEditing: false,
+      },
+    }))
+    .with({ type: "custom-ecl" }, (c) => ({
+      type: "custom-ecl" as const,
+      state: { ecl: c.ecl_path },
+    }))
+    .with({ type: "preset" }, (c) => {
       const toPreset = (p: PresetSelectionState) => ({ source: p.source, edited_flags: { ...p.edited_flags } });
       return {
-        type: "preset",
+        type: "preset" as const,
         state: {
-          ruleset_state: { preset: toPreset(cfg.config.ruleset), edit_path: "" },
-          variants_state: { presets: cfg.config.variants.map(toPreset), edit_path: "" },
-          tailorings_state: { presets: cfg.config.tailorings.map(toPreset), edit_path: "" },
+          ruleset_state: { preset: toPreset(c.ruleset), edit_path: "" },
+          variants_state: { presets: c.variants.map(toPreset), edit_path: "" },
+          tailorings_state: { presets: c.tailorings.map(toPreset), edit_path: "" },
         },
       };
-    }
-  }
+    })
+    .exhaustive();
 }
 
 export function eclairReducer(state: EclairState, action: EclairStateAction): EclairState {
   console.log("action: ", action);
-  switch (action.type) {
-    case "reset-to-defaults":
+  return match(action)
+    .with({ type: "reset-to-defaults" }, () =>
       // Preserve live status/install-path (managed by the probe, not stored config)
-      return default_eclair_state();
-
-    case "load-sca-config": {
-      const cfg = action.config;
+      default_eclair_state()
+    )
+    .with({ type: "load-sca-config" }, ({ config: cfg }) => {
       // When reloading config, reset scan states for any new/removed repos.
       const newRepos = cfg.repos ?? {};
       const newScanState: Record<string, RepoScanState> = {};
@@ -282,139 +276,111 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
         reports: { selected: cfg.reports && cfg.reports.length > 0 ? [...cfg.reports] : ["ALL"] },
         repos: newRepos,
         repos_scan_state: newScanState,
-      };
-    }
-
-    case "toggle-install-path-editing":
-      return {
-        ...state,
-        install_path: {
-          ...state.install_path,
-          editing: !state.install_path.editing,
-          disabled: !state.install_path.editing,
-        },
-      };
-
-    case "toggle-user-ruleset-name-editing":
+      } as EclairState;
+    })
+    .with({ type: "toggle-install-path-editing" }, () => ({
+      ...state,
+      install_path: {
+        ...state.install_path,
+        editing: !state.install_path.editing,
+        disabled: !state.install_path.editing,
+      },
+    }))
+    .with({ type: "toggle-user-ruleset-name-editing" }, () => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "zephyr-ruleset") {
         console.error("Cannot toggle user ruleset name editing: configuration is not zephyr-ruleset type");
         return state;
       }
-      const ruleset1 = state.analysis_configuration.ruleset;
+      const ruleset = state.analysis_configuration.ruleset;
       return {
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          ruleset: {
-            ...ruleset1,
-            userRulesetNameEditing: !ruleset1.userRulesetNameEditing
-          }
-        }
+          ruleset: { ...ruleset, userRulesetNameEditing: !ruleset.userRulesetNameEditing },
+        },
       };
-
-    case "toggle-user-ruleset-path-editing":
+    })
+    .with({ type: "toggle-user-ruleset-path-editing" }, () => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "zephyr-ruleset") {
         console.error("Cannot toggle user ruleset path editing: configuration is not zephyr-ruleset type");
         return state;
       }
-      const ruleset2 = state.analysis_configuration.ruleset;
+      const ruleset = state.analysis_configuration.ruleset;
       return {
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          ruleset: {
-            ...ruleset2,
-            userRulesetPathEditing: !ruleset2.userRulesetPathEditing
-          }
-        }
+          ruleset: { ...ruleset, userRulesetPathEditing: !ruleset.userRulesetPathEditing },
+        },
       };
-    
-    case "update-install-path":
-      return {
-        ...state,
-        install_path: { ...state.install_path, path: action.path },
-      };
-    
-    case "update-extra-config-path":
-      return {
-        ...state,
-        extra_config: { ...state.extra_config, path: action.path },
-      };
-    
-    case "update-configuration-type":
-      switch (action.configurationType) {
-        case "preset":
-          return {
-            ...state,
-            analysis_configuration: { type: "preset", state: default_presets_selection_state() }
-          };
-        case "custom-ecl":
-          return {
-            ...state,
-            analysis_configuration: { type: "custom-ecl", state: {} }
-          };
-        case "zephyr-ruleset":
-          return {
-            ...state,
-            analysis_configuration: {
-              type: "zephyr-ruleset",
-              ruleset: default_ruleset_state()
-            }
-          };
-      }
-    
-    case "update-ruleset-selection":
+    })
+    .with({ type: "update-install-path" }, ({ path }) => ({
+      ...state,
+      install_path: { ...state.install_path, path },
+    }))
+    .with({ type: "update-extra-config-path" }, ({ path }) => ({
+      ...state,
+      extra_config: { ...state.extra_config, path },
+    }))
+    .with({ type: "update-configuration-type" }, ({ configurationType }) =>
+      match(configurationType)
+        .with("preset", () => ({
+          ...state,
+          analysis_configuration: { type: "preset" as const, state: default_presets_selection_state() },
+        }))
+        .with("custom-ecl", () => ({
+          ...state,
+          analysis_configuration: { type: "custom-ecl" as const, state: {} },
+        }))
+        .with("zephyr-ruleset", () => ({
+          ...state,
+          analysis_configuration: { type: "zephyr-ruleset" as const, ruleset: default_ruleset_state() },
+        }))
+        .exhaustive()
+    )
+    .with({ type: "update-ruleset-selection" }, ({ ruleset: newRuleset }) => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "zephyr-ruleset") {
         console.error("Cannot update ruleset selection: configuration is not zephyr-ruleset type");
         return state;
       }
-      const ruleset3 = state.analysis_configuration.ruleset;
+      const ruleset = state.analysis_configuration.ruleset;
       return {
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          ruleset: {
-            ...ruleset3,
-            selected: action.ruleset
-          }
-        }
+          ruleset: { ...ruleset, selected: newRuleset },
+        },
       };
-    
-    case "update-user-ruleset-name":
+    })
+    .with({ type: "update-user-ruleset-name" }, ({ name }) => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "zephyr-ruleset") {
         console.error("Cannot update user ruleset name: configuration is not zephyr-ruleset type");
         return state;
       }
-      const ruleset4 = state.analysis_configuration.ruleset;
+      const ruleset = state.analysis_configuration.ruleset;
       return {
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          ruleset: {
-            ...ruleset4,
-            userRulesetName: action.name
-          }
-        }
+          ruleset: { ...ruleset, userRulesetName: name },
+        },
       };
-    
-    case "update-user-ruleset-path":
+    })
+    .with({ type: "update-user-ruleset-path" }, ({ path }) => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "zephyr-ruleset") {
         console.error("Cannot update user ruleset path: configuration is not zephyr-ruleset type");
         return state;
       }
-      const ruleset5 = state.analysis_configuration.ruleset;
+      const ruleset = state.analysis_configuration.ruleset;
       return {
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          ruleset: {
-            ...ruleset5,
-            userRulesetPath: action.path
-          }
-        }
+          ruleset: { ...ruleset, userRulesetPath: path },
+        },
       };
-    
-    case "update-custom-ecl-path":
+    })
+    .with({ type: "update-custom-ecl-path" }, ({ path }) => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "custom-ecl") {
         console.error("Cannot update custom ECL path: configuration is not custom-ecl type");
         return state;
@@ -423,110 +389,93 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          state: {
-            ...state.analysis_configuration.state,
-            ecl: action.path
-          }
-        }
+          state: { ...state.analysis_configuration.state, ecl: path },
+        },
       };
-    
-    case "toggle-report": {
+    })
+    .with({ type: "toggle-report" }, ({ report, checked }) => {
       let newReports = [...state.reports.selected];
-      
-      if (action.report === "ALL") {
-        newReports = action.checked ? ["ALL"] : [];
+      if (report === "ALL") {
+        newReports = checked ? ["ALL"] : [];
       } else {
         newReports = newReports.filter(r => r !== "ALL");
-        if (action.checked) {
-          newReports.push(action.report);
+        if (checked) {
+          newReports.push(report);
         } else {
-          newReports = newReports.filter(r => r !== action.report);
+          newReports = newReports.filter(r => r !== report);
         }
       }
-      
       return { ...state, reports: { selected: newReports } };
-    }
-    
-    case "toggle-spinner":
-      return {
-        ...state,
-        status: { ...state.status, showSpinner: action.show },
-      };
-    
-    case "set-eclair-status":
-      return {
-        ...state,
-        status: {
-          ...state.status,
-          installed: action.installed,
-          version: action.installed ? action.version.trim() || "Unknown" : "Unknown",
-        },
-      };
-    
-    case "set-install-path":
-      return {
-        ...state,
-        install_path: {
-          path: action.path,
-          placeholder: action.path ? "" : DEFAULT_INSTALL_PATH_PLACEHOLDER,
-          disabled: false,
-          editing: false,
-        },
-      };
-    
-    case "set-extra-config":
-      return {
-        ...state,
-        extra_config: { path: action.path },
-      };
-    
-    case "set-path-status":
-      return {
-        ...state,
-        install_path: action.text.trim().toLowerCase() === "checking"
-          ? { path: "", placeholder: "Checking", disabled: true, editing: false }
-          : action.text.trim() === ""
-            ? { ...state.install_path, path: "", placeholder: DEFAULT_INSTALL_PATH_PLACEHOLDER, disabled: true }
-            : { ...state.install_path, path: action.text, placeholder: "", disabled: true },
-      };
-    
-    case "set-user-ruleset-name":
+    })
+    .with({ type: "toggle-spinner" }, ({ show }) => ({
+      ...state,
+      status: { ...state.status, showSpinner: show },
+    }))
+    .with({ type: "set-eclair-status" }, ({ installed, version }) => ({
+      ...state,
+      status: {
+        ...state.status,
+        installed,
+        version: installed ? version.trim() || "Unknown" : "Unknown",
+      },
+    }))
+    .with({ type: "set-install-path" }, ({ path }) => ({
+      ...state,
+      install_path: {
+        path,
+        placeholder: path ? "" : DEFAULT_INSTALL_PATH_PLACEHOLDER,
+        disabled: false,
+        editing: false,
+      },
+    }))
+    .with({ type: "set-install-path-placeholder" }, ({ text }) => ({
+      ...state,
+      install_path: {
+        ...state.install_path,
+        placeholder: text,
+      },
+    }))
+    .with({ type: "set-extra-config" }, ({ path }) => ({
+      ...state,
+      extra_config: { path },
+    }))
+    .with({ type: "set-path-status" }, ({ text }) => ({
+      ...state,
+      install_path: text.trim().toLowerCase() === "checking"
+        ? { path: "", placeholder: "Checking", disabled: true, editing: false }
+        : text.trim() === ""
+          ? { ...state.install_path, path: "", placeholder: DEFAULT_INSTALL_PATH_PLACEHOLDER, disabled: true }
+          : { ...state.install_path, path: text, placeholder: "", disabled: true },
+    }))
+    .with({ type: "set-user-ruleset-name" }, ({ name }) => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "zephyr-ruleset") {
         console.error("Cannot set user ruleset name: configuration is not zephyr-ruleset type");
         return state;
       }
-      const ruleset6 = state.analysis_configuration.ruleset;
+      const ruleset = state.analysis_configuration.ruleset;
       return {
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          ruleset: {
-            ...ruleset6,
-            userRulesetName: action.name,
-            userRulesetNameEditing: false
-          }
-        }
+          ruleset: { ...ruleset, userRulesetName: name, userRulesetNameEditing: false },
+        },
       };
-    
-    case "set-user-ruleset-path":
+    })
+    .with({ type: "set-user-ruleset-path" }, ({ path }) => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "zephyr-ruleset") {
         console.error("Cannot set user ruleset path: configuration is not zephyr-ruleset type");
         return state;
       }
-      const ruleset7 = state.analysis_configuration.ruleset;
+      const ruleset = state.analysis_configuration.ruleset;
       return {
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          ruleset: {
-            ...ruleset7,
-            userRulesetPath: action.path,
-            userRulesetPathEditing: false
-          }
-        }
+          ruleset: { ...ruleset, userRulesetPath: path, userRulesetPathEditing: false },
+        },
       };
-    
-    case "set-custom-ecl-path":
+    })
+    .with({ type: "set-custom-ecl-path" }, ({ path }) => {
       if (state.analysis_configuration === null || state.analysis_configuration.type !== "custom-ecl") {
         console.error("Cannot set custom ECL path: configuration is not custom-ecl type");
         return state;
@@ -535,42 +484,31 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
         ...state,
         analysis_configuration: {
           ...state.analysis_configuration,
-          state: {
-            ...state.analysis_configuration.state,
-            ecl: action.path
-          }
-        }
+          state: { ...state.analysis_configuration.state, ecl: path },
+        },
       };
-    
-    case "report-server-started":
-      return {
-        ...state,
-        report_server: { running: true },
-      };
-    
-    case "report-server-stopped":
-      return {
-        ...state,
-        report_server: { running: false },
-      };
-
-    case "set-preset-flag": {
+    })
+    .with({ type: "report-server-started" }, () => ({
+      ...state,
+      report_server: { running: true },
+    }))
+    .with({ type: "report-server-stopped" }, () => ({
+      ...state,
+      report_server: { running: false },
+    }))
+    .with({ type: "set-preset-flag" }, ({ source, flagId, value }) => {
       if (state.analysis_configuration?.type !== "preset") {
         return state;
       }
       const current_state = state.analysis_configuration.state;
-      const sourceId = preset_template_source_id(action.source);
+      const sourceId = preset_template_source_id(source);
       const updatePreset = (preset: PresetSelectionState): PresetSelectionState => {
         if (preset_template_source_id(preset.source) !== sourceId) return preset;
         return {
           ...preset,
-          edited_flags: {
-            ...(preset.edited_flags ?? {}),
-            [action.flagId]: action.value,
-          },
+          edited_flags: { ...(preset.edited_flags ?? {}), [flagId]: value },
         };
       };
-
       return {
         ...state,
         analysis_configuration: {
@@ -594,23 +532,18 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
           },
         },
       };
-    }
-
-    case "clear-preset-flag": {
+    })
+    .with({ type: "clear-preset-flag" }, ({ source, flagId }) => {
       if (state.analysis_configuration?.type !== "preset") {
         return state;
       }
       const current_state = state.analysis_configuration.state;
-      const sourceId = preset_template_source_id(action.source);
+      const sourceId = preset_template_source_id(source);
       const updatePreset = (preset: PresetSelectionState): PresetSelectionState => {
         if (preset_template_source_id(preset.source) !== sourceId) return preset;
-        const { [action.flagId]: _removed, ...rest } = preset.edited_flags ?? {};
-        return {
-          ...preset,
-          edited_flags: rest,
-        };
+        const { [flagId]: _removed, ...rest } = preset.edited_flags ?? {};
+        return { ...preset, edited_flags: rest };
       };
-
       return {
         ...state,
         analysis_configuration: {
@@ -634,30 +567,28 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
           },
         },
       };
-    }
-    case "remove-selected-preset": {
+    })
+    .with({ type: "remove-selected-preset" }, ({ kind, index }) => {
       if (state.analysis_configuration?.type !== "preset") {
         return state;
       }
       const current_state = state.analysis_configuration.state;
-      switch (action.kind) {
-        case "ruleset": {
-          return {
-            ...state,
-            analysis_configuration: {
-              ...state.analysis_configuration,
-              state: {
-                ...current_state,
-                ruleset_state: { edit_path: "" },
-                variants_state: { ...current_state.variants_state, presets: [] },
-                tailorings_state: { ...current_state.tailorings_state, presets: [] },
-              }
-            }
-          };
-        }
-        case "variant": {
+      return match(kind)
+        .with("ruleset", () => ({
+          ...state,
+          analysis_configuration: {
+            ...state.analysis_configuration,
+            state: {
+              ...current_state,
+              ruleset_state: { edit_path: "" },
+              variants_state: { ...current_state.variants_state, presets: [] },
+              tailorings_state: { ...current_state.tailorings_state, presets: [] },
+            },
+          } as AnalysisConfigurationState,
+        }))
+        .with("variant", () => {
           const new_variants = [...current_state.variants_state.presets];
-          new_variants.splice(action.index, 1);
+          new_variants.splice(index, 1);
           return {
             ...state,
             analysis_configuration: {
@@ -665,13 +596,13 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
               state: {
                 ...current_state,
                 variants_state: { ...current_state.variants_state, presets: new_variants },
-              }
-            }
+              },
+            } as AnalysisConfigurationState,
           };
-        }
-        case "tailoring": {
+        })
+        .with("tailoring", () => {
           const new_tailorings = [...current_state.tailorings_state.presets];
-          new_tailorings.splice(action.index, 1);
+          new_tailorings.splice(index, 1);
           return {
             ...state,
             analysis_configuration: {
@@ -679,197 +610,174 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
               state: {
                 ...current_state,
                 tailorings_state: { ...current_state.tailorings_state, presets: new_tailorings },
-              }
-            }
+              },
+            } as AnalysisConfigurationState,
           };
-        }
-      }
-    }
-    case "preset-content": {
-      const { source, template } = action;
+        })
+        .exhaustive();
+    })
+    .with({ type: "preset-content" }, ({ source, template }) => {
       const newPresets = new Map(state.available_presets.by_path);
       const newRepoPresets = new Map(state.available_presets.by_repo_path);
-
-      switch (source.type) {
-        case "system-path":
-          newPresets.set(source.path, template);
-          break;
-        case "repo-path": {
-          let byPath = newRepoPresets.get(source.repo);
+      return match(source)
+        .with({ type: "system-path" }, ({ path }) => {
+          newPresets.set(path, template);
+          return {
+            ...state,
+            available_presets: { by_path: newPresets, by_repo_path: newRepoPresets },
+          };
+        })
+        .with({ type: "repo-path" }, ({ repo, path }) => {
+          let byPath = newRepoPresets.get(repo);
           if (!byPath) {
             byPath = new Map();
-            newRepoPresets.set(source.repo, byPath);
+            newRepoPresets.set(repo, byPath);
           }
-          byPath.set(source.path, template);
-          break;
-        }
-      }
-      
-      return {
-        ...state,
-        available_presets: {
-          by_path: newPresets,
-          by_repo_path: newRepoPresets,
-        }
-      };
-    }
-    case "set-preset-path": {
-      const { kind, path } = action;
-      if (state.analysis_configuration?.type !== "preset") {
+          byPath.set(path, template);
+          return {
+            ...state,
+            available_presets: { by_path: newPresets, by_repo_path: newRepoPresets },
+          };
+        })
+        .exhaustive();
+    })
+    .with({ type: "set-preset-path" }, ({ kind, path }) => {
+      if (state.analysis_configuration.type !== "preset") {
         return state;
       }
-      //const s = state.analysis_configuration.state;
-      switch (kind) {
-        case "ruleset": {
+      const s = state.analysis_configuration.state;
+      return match(kind)
+        .with("ruleset", () => ({
+          ...state,
+          analysis_configuration: {
+            ...state.analysis_configuration,
+            state: {
+              ...s,
+              ruleset_state: {
+                ...s.ruleset_state,
+                edit_path: path,
+              },
+            },
+          } as AnalysisConfigurationState,
+        }))
+        .with("variant", () => {
           return {
             ...state,
             analysis_configuration: {
               ...state.analysis_configuration,
               state: {
-                ...state.analysis_configuration.state,
-                ruleset_state: {
-                  ...state.analysis_configuration.state.ruleset_state,
-                  edit_path: path,
-                }
-              }
-            }
-          };
-        }
-        case "variant": {
-          return {
-            ...state,
-            analysis_configuration: {
-              ...state.analysis_configuration,
-              state: {
-                ...state.analysis_configuration.state,
+                ...s,
                 variants_state: {
-                  ...state.analysis_configuration.state.variants_state,
+                  ...s.variants_state,
                   edit_path: path,
-                }
-              }
-            }
+                },
+              },
+            } as AnalysisConfigurationState,
           };
-        }
-        case "tailoring": {
-          return {
-            ...state,
-            analysis_configuration: {
-              ...state.analysis_configuration,
-              state: {
-                ...state.analysis_configuration.state,
-                tailorings_state: {
-                  ...state.analysis_configuration.state.tailorings_state,
-                  edit_path: path,
-                }
-              }
-            }
-          };
-        }
-      }
-    }
-    case "set-or-add-preset": {
-      const { kind, source } = action;
+        })
+        .with("tailoring", () => ({
+          ...state,
+          analysis_configuration: {
+            ...state.analysis_configuration,
+            state: {
+              ...s,
+              tailorings_state: {
+                ...s.tailorings_state,
+                edit_path: path,
+              },
+            },
+          } as AnalysisConfigurationState,
+        }))
+        .exhaustive();
+    })
+    .with({ type: "set-or-add-preset" }, ({ kind, source }) => {
       if (state.analysis_configuration?.type !== "preset") {
         return state;
       }
       const current_state = state.analysis_configuration.state;
-      switch (kind) {
-        case "ruleset": {
-          const new_preset = { source, edited_flags: {} };
-          return {
-            ...state,
-            analysis_configuration: {
-              ...state.analysis_configuration,
-              state: {
-                ...current_state,
-                ruleset_state: {
-                  ...current_state.ruleset_state,
-                  preset: new_preset,
-                }
-              }
-            }
-          };
-        }
-        case "variant": {
-          const new_preset = { source, edited_flags: {} };
-          return {
-            ...state,
-            analysis_configuration: {
-              ...state.analysis_configuration,
-              state: {
-                ...current_state,
-                variants_state: {
-                  ...current_state.variants_state,
-                  presets: [...current_state.variants_state.presets, new_preset],
-                }
-              }
-            }
-          };
-        }
-        case "tailoring": {
-          const new_preset = { source, edited_flags: {} };
-          return {
-            ...state,
-            analysis_configuration: {
-              ...state.analysis_configuration,
-              state: {
-                ...current_state,
-                tailorings_state: {
-                  ...current_state.tailorings_state,
-                  presets: [...current_state.tailorings_state.presets, new_preset],
-                }
-              }
-            }
-          };
-        }
-      }
-    }
-    case "add-repo":
-    case "update-repo":
-      return {
-        ...state,
-        repos: { ...state.repos, [action.name]: { origin: action.origin, ref: action.rev } },
-        // Reset scan state when a repo is added or its configuration changes.
-        repos_scan_state: { ...state.repos_scan_state, [action.name]: { status: "idle" } },
-      };
-    case "remove-repo": {
-      const { [action.name]: _removedRepo, ...restRepos } = state.repos;
-      const { [action.name]: _removedScan, ...restScan } = state.repos_scan_state;
+      const new_preset = { source, edited_flags: {} };
+      return match(kind)
+        .with("ruleset", () => ({
+          ...state,
+          analysis_configuration: {
+            ...state.analysis_configuration,
+            state: {
+              ...current_state,
+              ruleset_state: { ...current_state.ruleset_state, preset: new_preset },
+            },
+          } as AnalysisConfigurationState,
+        }))
+        .with("variant", () => ({
+          ...state,
+          analysis_configuration: {
+            ...state.analysis_configuration,
+            state: {
+              ...current_state,
+              variants_state: {
+                ...current_state.variants_state,
+                presets: [...current_state.variants_state.presets, new_preset],
+              },
+            },
+          } as AnalysisConfigurationState,
+        }))
+        .with("tailoring", () => ({
+          ...state,
+          analysis_configuration: {
+            ...state.analysis_configuration,
+            state: {
+              ...current_state,
+              tailorings_state: {
+                ...current_state.tailorings_state,
+                presets: [...current_state.tailorings_state.presets, new_preset],
+              },
+            },
+          } as AnalysisConfigurationState,
+        }))
+        .exhaustive();
+    })
+    .with({ type: "add-repo" }, ({ name, origin, rev }) => ({
+      ...state,
+      repos: { ...state.repos, [name]: { origin, ref: rev } },
+      // Reset scan state when a repo is added or its configuration changes.
+      repos_scan_state: { ...state.repos_scan_state, [name]: { status: "idle" } },
+    } as EclairState))
+    .with({ type: "update-repo" }, ({ name, origin, rev }) => ({
+      ...state,
+      repos: { ...state.repos, [name]: { origin, ref: rev } },
+      // Reset scan state when a repo's configuration changes.
+      repos_scan_state: { ...state.repos_scan_state, [name]: { status: "idle" } },
+    } as EclairState))
+    .with({ type: "remove-repo" }, ({ name }) => {
+      const { [name]: _removedRepo, ...restRepos } = state.repos;
+      const { [name]: _removedScan, ...restScan } = state.repos_scan_state;
       // Also clear all preset-content entries for this repo.
       const newByRepoPath = new Map(state.available_presets.by_repo_path);
-      newByRepoPath.delete(action.name);
+      newByRepoPath.delete(name);
       return {
         ...state,
         repos: restRepos,
         repos_scan_state: restScan,
         available_presets: { ...state.available_presets, by_repo_path: newByRepoPath },
-      };
-    }
-
-    case "repo-scan-started":
-      return {
-        ...state,
-        repos_scan_state: { ...state.repos_scan_state, [action.name]: { status: "loading" } },
-      };
-
-    case "repo-scan-done": {
+      } as EclairState;
+    })
+    .with({ type: "repo-scan-started" }, ({ name }) => ({
+      ...state,
+      repos_scan_state: { ...state.repos_scan_state, [name]: { status: "loading" } },
+    } as EclairState))
+    .with({ type: "repo-scan-done" }, ({ name }) => {
       // Count successfully loaded templates for this repo.
-      const byPath = state.available_presets.by_repo_path.get(action.name);
+      const byPath = state.available_presets.by_repo_path.get(name);
       const templateCount = byPath
         ? [...byPath.values()].filter(t => !("loading" in t) && !("error" in t)).length
         : 0;
       return {
         ...state,
-        repos_scan_state: { ...state.repos_scan_state, [action.name]: { status: "success", templateCount } },
-      };
-    }
-
-    case "repo-scan-failed":
-      return {
-        ...state,
-        repos_scan_state: { ...state.repos_scan_state, [action.name]: { status: "error", message: action.message } },
-      };
-
-      return state;
-  }
+        repos_scan_state: { ...state.repos_scan_state, [name]: { status: "success", templateCount } },
+      } as EclairState;
+    })
+    .with({ type: "repo-scan-failed" }, ({ name, message }) => ({
+      ...state,
+      repos_scan_state: { ...state.repos_scan_state, [name]: { status: "error", message } },
+    } as EclairState))
+    .exhaustive();
 }
