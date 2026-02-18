@@ -609,285 +609,285 @@ export class EclairManagerPanel {
    * This is the main bridge between UI actions and backend logic.
    */
   private _setWebviewMessageListener(webview: vscode.Webview) {
+    webview.onDidReceiveMessage(
+      this._on_webview_message.bind(this),
+      undefined,
+      this._disposables,
+    );
+  }
+
+  async _on_webview_message(m: WebviewMessage) {
     function open_link(url: string) {
       vscode.env.openExternal(vscode.Uri.parse(url));
     }
 
-    webview.onDidReceiveMessage(async (m: WebviewMessage) => {
-      match(m)
-        .with({ command: "update-path" }, ({ tool, newPath }) => {
-          if (tool === "eclair") {
-            this.saveEclairPathToEnv(newPath);
-            const eclairInfo = this.getEclairPathFromEnv();
-            const path = eclairInfo?.path || "";
-            // TODO post_message({ command: "path-updated", tool, path, success: true });
-          }
-        })
-        .with({ command: "browse-path" }, async ({ tool }) => {
-          if (tool !== "eclair") {
-            return;
-          }
+    match(m)
+      .with({ command: "update-path" }, ({ newPath }) => {
+        this.saveEclairPathToEnv(newPath);
+        const eclairInfo = this.getEclairPathFromEnv();
+        const path = eclairInfo.path || "";
+        // TODO post_message({ command: "path-updated", tool, path, success: true });
+      })
+      .with({ command: "browse-path" }, async () => {
+        const pick = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          title: "Select the ECLAIR installation",
+        });
+        if (!pick || !pick[0]) {
+          return;
+        }
 
-          const pick = await vscode.window.showOpenDialog({
-            canSelectFiles: false,
-            canSelectFolders: true,
-            canSelectMany: false,
-            title: "Select the ECLAIR installation",
+        const chosen = pick[0].fsPath.trim();
+        this.saveEclairPathToEnv(chosen);
+        const eclairInfo = this.getEclairPathFromEnv();
+        const path = eclairInfo?.path || "";
+        // TODO post_message({ command: "path-updated", tool, path, success: true, FromBrowse: true });
+      })
+      .with({ command: "manage-license" }, () => open_link("http://localhost:1947"))
+      .with({ command: "request-trial" }, () => open_link("https://www.bugseng.com/eclair-request-trial/"))
+      .with({ command: "about-eclair" }, () => open_link("https://www.bugseng.com/eclair-static-analysis-tool/"))
+      .with({ command: "refresh-status" }, async () => this.refresh_status())
+      .with({ command: "browse-extra-config" }, async () => {
+        const folderUri = this.resolveApplicationFolderUri();
+        const pick = await vscode.window.showOpenDialog({
+          canSelectFiles: true,
+          canSelectFolders: false,
+          canSelectMany: false,
+          defaultUri: folderUri,
+          title: "Select the additional configuration",
+          filters: {
+            "ECL file": ["ecl", "eclair", "cmake"],
+            "All files": ["*"]
+          }
+        });
+        if (pick?.[0]) {
+          const chosen = pick[0].fsPath;
+          this.post_message({ command: "set-extra-config", path: chosen });
+        }
+      })
+      .with({ command: "save-sca-config" }, async ({ config: cfg }) => {
+        await this.saveScaConfig(cfg);
+      })
+      .with({ command: "run-command" }, async ({ config: cfg }) => {
+        await this.saveScaConfig(cfg);
+
+        // Determine application directory
+        const folderUri = this.resolveApplicationFolderUri();
+        const appDir = folderUri?.fsPath;
+
+        if (!appDir) {
+          vscode.window.showErrorMessage("Unable to determine application directory for west build.");
+          return;
+        }
+
+        // Determine folder URI for configuration
+        const config = vscode.workspace.getConfiguration(undefined, folderUri);
+        const configs = config.get<any[]>("zephyr-workbench.build.configurations") ?? [];
+        const activeIdx = configs.findIndex(c => c?.active === true || c?.active === "true");
+        const idx = activeIdx >= 0 ? activeIdx : 0;
+
+        // Resolve BOARD from configuration (configurations[].board > zephyr-workbench.board > env)
+        const board =
+          (configs?.[idx]?.board?.toString()?.trim() || "") ||
+          (config.get<string>("zephyr-workbench.board")?.trim() || "") ||
+          (process.env.BOARD?.trim() || "");
+
+        if (!board) {
+          vscode.window.showErrorMessage(
+            "BOARD not set. Please set it before running ECLAIR analysis."
+          );
+          return;
+        }
+
+        const buildDir = this.getBuildDir(configs, idx, appDir);
+        // TODO: deepResolvePaths is a blunt recursive replacement — replace with targeted field handling.
+        const cmakeArgs = build_cmake_args(this.deepResolvePaths(cfg));
+
+        const cmd = [
+          "west",
+          "build",
+          "--pristine",
+          `-s "${appDir}"`,
+          `-d "${buildDir}"`,
+          `--board=${board}`,
+          "--",
+          cmakeArgs
+        ].filter(Boolean).join(" ");
+
+        /*
+
+        // Run from west workspace 
+        const westTopdir = this.getWestWorkspacePath();
+        
+        if (!westTopdir) {
+          vscode.window.showErrorMessage("West workspace not found.");
+          return;
+        }
+
+        // Determine extra paths for environment
+        const extraPaths: string[] = [];
+        const sdk = process.env.ZEPHYR_SDK_INSTALL_DIR;
+        if (sdk) {
+          extraPaths.push(path.join(sdk, "arm-zephyr-eabi", "bin"));
+          extraPaths.push(path.join(sdk, "cmake", "bin"));
+          extraPaths.push(path.join(sdk, "ninja"));
+        }
+        const westFromInstaller = path.join(
+          process.env.USERPROFILE ?? "",
+          ".zinstaller",
+          ".venv",
+          "Scripts"
+        );
+        if (existsSync(westFromInstaller)) {
+          extraPaths.push(westFromInstaller);
+        }
+        // Add ECLAIR dir
+        const eclairDir = await this.detectEclairDir();
+        if (eclairDir && existsSync(eclairDir)) {
+          extraPaths.push(eclairDir);
+        }
+
+        // Ensure all env values are strings (not undefined)
+        const mergedEnv: { [key: string]: string } = {};
+        for (const [k, v] of Object.entries(process.env)) {
+          if (typeof v === "string") mergedEnv[k] = v;
+          else mergedEnv[k] = "";
+        }
+
+        // Disable ccache for SCA/ECLAIR (breaks wrapper script)
+        mergedEnv.CCACHE_DISABLE = "1";
+        mergedEnv.PATH =
+          (extraPaths.length ? extraPaths.join(path.delimiter) + path.delimiter : "") +
+          (process.env.PATH || "");
+
+        // Inject Zephyr SDK and essential variables into the environment
+        // Detect SDK (can be hardcoded for your test case)
+        let zephyrSdk = this.detectZephyrSdkDir();
+        // If not found, try buildDir (in case SDK is in the project)
+        if (!zephyrSdk && buildDir) {
+          const guess = path.join(path.dirname(buildDir), "zephyr-sdk-0.17.4");
+          if (fs.existsSync(guess)) zephyrSdk = guess;
+        }
+        if (zephyrSdk) {
+          mergedEnv.ZEPHYR_SDK_INSTALL_DIR = zephyrSdk;
+          mergedEnv.ZEPHYR_TOOLCHAIN_VARIANT = "zephyr";
+          mergedEnv.CMAKE_PREFIX_PATH = [
+            zephyrSdk,
+            path.join(zephyrSdk, "cmake"),
+            process.env.CMAKE_PREFIX_PATH
+          ].filter(Boolean).join(path.delimiter);
+          mergedEnv.PATH = [
+            path.join(zephyrSdk, "arm-zephyr-eabi", "bin"),
+            path.join(zephyrSdk, "cmake", "bin"),
+            mergedEnv.PATH
+          ].join(path.delimiter);
+        }
+
+        const out = getOutputChannel();
+        out.appendLine(`[ECLAIR cwd: ${westTopdir}`);
+        out.appendLine(`[ECLAIR cmd: ${cmd}`);
+        out.appendLine(`[ECLAIR ZEPHYR_SDK_INSTALL_DIR=${mergedEnv.ZEPHYR_SDK_INSTALL_DIR}`);
+        out.appendLine(`[ECLAIR ZEPHYR_TOOLCHAIN_VARIANT=${mergedEnv.ZEPHYR_TOOLCHAIN_VARIANT}`);
+        out.appendLine(`[ECLAIR CMAKE_PREFIX_PATH=${mergedEnv.CMAKE_PREFIX_PATH}`);
+
+        try {
+          await execShellCommandWithEnv("ECLAIR Analysis", cmd, {
+            cwd: westTopdir,
+            env: mergedEnv,
           });
-          if (!pick || !pick[0]) {
-            return;
-          }
-
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Failed to run ECLAIR: ${err}`);
+        }*/
+      })
+      .with({ command: "probe-eclair" }, () => this.runEclair())
+      .with({ command: "browse-user-ruleset-path" }, async () => {
+        const pick = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          title: "Select Ruleset path"
+        });
+        if (pick && pick[0]) {
           const chosen = pick[0].fsPath.trim();
-          this.saveEclairPathToEnv(chosen);
-          const eclairInfo = this.getEclairPathFromEnv();
-          const path = eclairInfo?.path || "";
-          // TODO post_message({ command: "path-updated", tool, path, success: true, FromBrowse: true });
-        })
-        .with({ command: "manage-license" }, () => open_link("http://localhost:1947"))
-        .with({ command: "request-trial" }, () => open_link("https://www.bugseng.com/eclair-request-trial/"))
-        .with({ command: "about-eclair" }, () => open_link("https://www.bugseng.com/eclair-static-analysis-tool/"))
-        .with({ command: "refresh-status" }, async () => this.refresh_status())
-        .with({ command: "browse-extra-config" }, async () => {
+          this.post_message({ command: "set-user-ruleset-path", path: chosen });
+          // save path select from the browse dialog
           const folderUri = this.resolveApplicationFolderUri();
-          const pick = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
-            defaultUri: folderUri,
-            title: "Select the additional configuration",
-            filters: {
-              "ECL file": ["ecl", "eclair", "cmake"],
-              "All files": ["*"]
-            }
-          });
-          if (pick?.[0]) {
-            const chosen = pick[0].fsPath;
-            this.post_message({ command: "set-extra-config", path: chosen });
-          }
-        })
-        .with({ command: "save-sca-config" }, async ({ config: cfg }) => {
-          await this.saveScaConfig(cfg);
-        })
-        .with({ command: "run-command" }, async ({ config: cfg }) => {
-          await this.saveScaConfig(cfg);
-
-          // Determine application directory
-          const folderUri = this.resolveApplicationFolderUri();
-          const appDir = folderUri?.fsPath;
-
-          if (!appDir) {
-            vscode.window.showErrorMessage("Unable to determine application directory for west build.");
-            return;
-          }
-
-          // Determine folder URI for configuration
+          if (!folderUri) return;
           const config = vscode.workspace.getConfiguration(undefined, folderUri);
           const configs = config.get<any[]>("zephyr-workbench.build.configurations") ?? [];
           const activeIdx = configs.findIndex(c => c?.active === true || c?.active === "true");
           const idx = activeIdx >= 0 ? activeIdx : 0;
-
-          // Resolve BOARD from configuration (configurations[].board > zephyr-workbench.board > env)
-          const board =
-            (configs?.[idx]?.board?.toString()?.trim() || "") ||
-            (config.get<string>("zephyr-workbench.board")?.trim() || "") ||
-            (process.env.BOARD?.trim() || "");
-
-          if (!board) {
-            vscode.window.showErrorMessage(
-              "BOARD not set. Please set it before running ECLAIR analysis."
-            );
-            return;
+          if (configs[idx] && Array.isArray(configs[idx].sca) && configs[idx].sca.length > 0) {
+            configs[idx].sca[0].userRulesetPath = this.deepTokenizePaths(chosen);
+            await config.update("zephyr-workbench.build.configurations", configs, vscode.ConfigurationTarget.WorkspaceFolder);
           }
-
-          const buildDir = this.getBuildDir(configs, idx, appDir);
-          // TODO: deepResolvePaths is a blunt recursive replacement — replace with targeted field handling.
-          const cmakeArgs = build_cmake_args(this.deepResolvePaths(cfg));
-
-          const cmd = [
-            "west",
-            "build",
-            "--pristine",
-            `-s "${appDir}"`,
-            `-d "${buildDir}"`,
-            `--board=${board}`,
-            "--",
-            cmakeArgs
-          ].filter(Boolean).join(" ");
-
-          /*
-
-          // Run from west workspace 
-          const westTopdir = this.getWestWorkspacePath();
-          
-          if (!westTopdir) {
-            vscode.window.showErrorMessage("West workspace not found.");
-            return;
+        }
+      })
+      .with({ command: "browse-custom-ecl-path" }, async () => {
+        const folderUri = this.resolveApplicationFolderUri();
+        const pick = await vscode.window.showOpenDialog({
+          canSelectFiles: true,
+          canSelectFolders: false,
+          canSelectMany: false,
+          defaultUri: folderUri,
+          title: "Select custom ECL configuration file",
+          filters: {
+            "ECL file": ["ecl"],
+            "All files": ["*"]
           }
-
-          // Determine extra paths for environment
-          const extraPaths: string[] = [];
-          const sdk = process.env.ZEPHYR_SDK_INSTALL_DIR;
-          if (sdk) {
-            extraPaths.push(path.join(sdk, "arm-zephyr-eabi", "bin"));
-            extraPaths.push(path.join(sdk, "cmake", "bin"));
-            extraPaths.push(path.join(sdk, "ninja"));
+        });
+        if (pick && pick[0]) {
+          const chosen = pick[0].fsPath.trim();
+          this.post_message({ command: "set-custom-ecl-path", path: chosen });
+        }
+      })
+      .with({ command: "start-report-server" }, async () => this.startReportServer())
+      .with({ command: "stop-report-server" }, async () => this.stopReportServer())
+      .with({ command: "load-preset-from-path" }, ({ path: presetPath }) => {
+        load_preset_from_path_and_notify(presetPath, this.post_message.bind(this));
+      })
+      .with({ command: "load-preset-from-repo" }, async ({ name, path: repoPath }) => {
+        // Look up origin & ref from the stored config — the webview only knows
+        // the logical name and the relative file path.
+        const folderUri = this.resolveApplicationFolderUri();
+        const wsCfg = folderUri ? vscode.workspace.getConfiguration(undefined, folderUri) : undefined;
+        const wsCfgs = wsCfg?.get<any[]>("zephyr-workbench.build.configurations") ?? [];
+        const activeIdx2 = wsCfgs.findIndex((c: any) => c?.active === true || c?.active === "true");
+        const cfgIdx = activeIdx2 >= 0 ? activeIdx2 : 0;
+        const scaCfgRaw = wsCfgs[cfgIdx]?.sca?.[0]?.cfg;
+        const repos = (scaCfgRaw?.repos ?? {}) as Record<string, { origin: string; ref: string }>;
+        const entry = repos[name];
+        if (!entry) {
+          const src: EclairPresetTemplateSource = { type: "repo-path", repo: name, path: repoPath };
+          this.post_message({ command: "preset-content", source: src, template: { error: `Repository '${name}' not found in repos configuration.` } });
+          return;
+        }
+        load_preset_from_repo(name, entry.origin, entry.ref, repoPath, this.post_message.bind(this));
+      })
+      .with({ command: "scan-repo" }, ({ name, origin, ref }) => {
+        // Immediately check out the repo and scan all .ecl files, sending
+        // back preset-content messages so the webview picker is updated.
+        scanAllRepoPresets(name, origin, ref, this.post_message.bind(this));
+      })
+      .with({ command: "pick-preset-path" }, async ({ kind }) => {
+        const pick = await vscode.window.showOpenDialog({
+          canSelectFiles: true,
+          canSelectFolders: false,
+          canSelectMany: false,
+          title: "Select preset file",
+          filters: {
+            "ECL presets": ["ecl"],
+            "All files": ["*"]
           }
-          const westFromInstaller = path.join(
-            process.env.USERPROFILE ?? "",
-            ".zinstaller",
-            ".venv",
-            "Scripts"
-          );
-          if (existsSync(westFromInstaller)) {
-            extraPaths.push(westFromInstaller);
-          }
-          // Add ECLAIR dir
-          const eclairDir = await this.detectEclairDir();
-          if (eclairDir && existsSync(eclairDir)) {
-            extraPaths.push(eclairDir);
-          }
-
-          // Ensure all env values are strings (not undefined)
-          const mergedEnv: { [key: string]: string } = {};
-          for (const [k, v] of Object.entries(process.env)) {
-            if (typeof v === "string") mergedEnv[k] = v;
-            else mergedEnv[k] = "";
-          }
-
-          // Disable ccache for SCA/ECLAIR (breaks wrapper script)
-          mergedEnv.CCACHE_DISABLE = "1";
-          mergedEnv.PATH =
-            (extraPaths.length ? extraPaths.join(path.delimiter) + path.delimiter : "") +
-            (process.env.PATH || "");
-
-          // Inject Zephyr SDK and essential variables into the environment
-          // Detect SDK (can be hardcoded for your test case)
-          let zephyrSdk = this.detectZephyrSdkDir();
-          // If not found, try buildDir (in case SDK is in the project)
-          if (!zephyrSdk && buildDir) {
-            const guess = path.join(path.dirname(buildDir), "zephyr-sdk-0.17.4");
-            if (fs.existsSync(guess)) zephyrSdk = guess;
-          }
-          if (zephyrSdk) {
-            mergedEnv.ZEPHYR_SDK_INSTALL_DIR = zephyrSdk;
-            mergedEnv.ZEPHYR_TOOLCHAIN_VARIANT = "zephyr";
-            mergedEnv.CMAKE_PREFIX_PATH = [
-              zephyrSdk,
-              path.join(zephyrSdk, "cmake"),
-              process.env.CMAKE_PREFIX_PATH
-            ].filter(Boolean).join(path.delimiter);
-            mergedEnv.PATH = [
-              path.join(zephyrSdk, "arm-zephyr-eabi", "bin"),
-              path.join(zephyrSdk, "cmake", "bin"),
-              mergedEnv.PATH
-            ].join(path.delimiter);
-          }
-
-          const out = getOutputChannel();
-          out.appendLine(`[ECLAIR cwd: ${westTopdir}`);
-          out.appendLine(`[ECLAIR cmd: ${cmd}`);
-          out.appendLine(`[ECLAIR ZEPHYR_SDK_INSTALL_DIR=${mergedEnv.ZEPHYR_SDK_INSTALL_DIR}`);
-          out.appendLine(`[ECLAIR ZEPHYR_TOOLCHAIN_VARIANT=${mergedEnv.ZEPHYR_TOOLCHAIN_VARIANT}`);
-          out.appendLine(`[ECLAIR CMAKE_PREFIX_PATH=${mergedEnv.CMAKE_PREFIX_PATH}`);
-
-          try {
-            await execShellCommandWithEnv("ECLAIR Analysis", cmd, {
-              cwd: westTopdir,
-              env: mergedEnv,
-            });
-          } catch (err: any) {
-            vscode.window.showErrorMessage(`Failed to run ECLAIR: ${err}`);
-          }*/
-        })
-        .with({ command: "probe-eclair" }, () => this.runEclair())
-        .with({ command: "browse-user-ruleset-path" }, async () => {
-          const pick = await vscode.window.showOpenDialog({
-            canSelectFiles: false,
-            canSelectFolders: true,
-            canSelectMany: false,
-            title: "Select Ruleset path"
-          });
-          if (pick && pick[0]) {
-            const chosen = pick[0].fsPath.trim();
-            this.post_message({ command: "set-user-ruleset-path", path: chosen });
-            // save path select from the browse dialog
-            const folderUri = this.resolveApplicationFolderUri();
-            if (!folderUri) return;
-            const config = vscode.workspace.getConfiguration(undefined, folderUri);
-            const configs = config.get<any[]>("zephyr-workbench.build.configurations") ?? [];
-            const activeIdx = configs.findIndex(c => c?.active === true || c?.active === "true");
-            const idx = activeIdx >= 0 ? activeIdx : 0;
-            if (configs[idx] && Array.isArray(configs[idx].sca) && configs[idx].sca.length > 0) {
-              configs[idx].sca[0].userRulesetPath = this.deepTokenizePaths(chosen);
-              await config.update("zephyr-workbench.build.configurations", configs, vscode.ConfigurationTarget.WorkspaceFolder);
-            }
-          }
-        })
-        .with({ command: "browse-custom-ecl-path" }, async () => {
-          const folderUri = this.resolveApplicationFolderUri();
-          const pick = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
-            defaultUri: folderUri,
-            title: "Select custom ECL configuration file",
-            filters: {
-              "ECL file": ["ecl"],
-              "All files": ["*"]
-            }
-          });
-          if (pick && pick[0]) {
-            const chosen = pick[0].fsPath.trim();
-            this.post_message({ command: "set-custom-ecl-path", path: chosen });
-          }
-        })
-        .with({ command: "start-report-server" }, async () => this.startReportServer())
-        .with({ command: "stop-report-server" }, async () => this.stopReportServer())
-        .with({ command: "load-preset-from-path" }, ({ path: presetPath }) => {
-          load_preset_from_path_and_notify(presetPath, this.post_message.bind(this));
-        })
-        .with({ command: "load-preset-from-repo" }, async ({ name, path: repoPath }) => {
-          // Look up origin & ref from the stored config — the webview only knows
-          // the logical name and the relative file path.
-          const folderUri = this.resolveApplicationFolderUri();
-          const wsCfg = folderUri ? vscode.workspace.getConfiguration(undefined, folderUri) : undefined;
-          const wsCfgs = wsCfg?.get<any[]>("zephyr-workbench.build.configurations") ?? [];
-          const activeIdx2 = wsCfgs.findIndex((c: any) => c?.active === true || c?.active === "true");
-          const cfgIdx = activeIdx2 >= 0 ? activeIdx2 : 0;
-          const scaCfgRaw = wsCfgs[cfgIdx]?.sca?.[0]?.cfg;
-          const repos = (scaCfgRaw?.repos ?? {}) as Record<string, { origin: string; ref: string }>;
-          const entry = repos[name];
-          if (!entry) {
-            const src: EclairPresetTemplateSource = { type: "repo-path", repo: name, path: repoPath };
-            this.post_message({ command: "preset-content", source: src, template: { error: `Repository '${name}' not found in repos configuration.` } });
-            return;
-          }
-          load_preset_from_repo(name, entry.origin, entry.ref, repoPath, this.post_message.bind(this));
-        })
-        .with({ command: "scan-repo" }, ({ name, origin, ref }) => {
-          // Immediately check out the repo and scan all .ecl files, sending
-          // back preset-content messages so the webview picker is updated.
-          scanAllRepoPresets(name, origin, ref, this.post_message.bind(this));
-        })
-        .with({ command: "pick-preset-path" }, async ({ kind }) => {
-          const pick = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
-            title: "Select preset file",
-            filters: {
-              "ECL presets": ["ecl"],
-              "All files": ["*"]
-            }
-          });
-          if (pick && pick[0]) {
-            const chosen = pick[0].fsPath.trim();
-            this.post_message({ command: "template-path-picked", kind, path: chosen });
-          }
-        })
-        .exhaustive();
-    }, undefined, this._disposables);
+        });
+        if (pick && pick[0]) {
+          const chosen = pick[0].fsPath.trim();
+          this.post_message({ command: "template-path-picked", kind, path: chosen });
+        }
+      })
+      .exhaustive();
   }
 
   private getBuildDir(configs: any, idx: number, appDir: string): string {

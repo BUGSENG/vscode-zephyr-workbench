@@ -65,11 +65,9 @@ export type WebviewMessage = {
   command: "probe-eclair",
 } | {
   command: "update-path",
-  tool: string,
   newPath: string,
 } | {
   command: "browse-path",
-  tool: string,
 } | {
   command: "browse-extra-config",
 } | {

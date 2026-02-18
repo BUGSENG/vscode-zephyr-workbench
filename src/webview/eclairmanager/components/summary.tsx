@@ -49,11 +49,10 @@ export function Summary(props: {
           props.dispatch_state({ type: "update-install-path", path: newPath });
           props.post_message({
             command: "update-path",
-            tool: "eclair",
             newPath: newPath.trim(),
           });
         }}
-        on_pick={() => props.post_message({ command: "browse-path", tool: "eclair" })}
+        on_pick={() => props.post_message({ command: "browse-path" })}
       />
     </div>
   );
