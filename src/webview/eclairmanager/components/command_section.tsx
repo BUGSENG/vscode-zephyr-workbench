@@ -3,13 +3,16 @@ import { VscodeButton, VscodeAlert } from "./vscode";
 import { WebviewMessage } from "../../../utils/eclairEvent";
 import { EclairScaConfig } from "../../../utils/eclair/config";
 import { Result } from "../../../utils/typing_utils";
+import { EclairStateAction } from "../state";
 
 export function CommandSection({
   post_message,
   config,
+  dispatch_state,
 }: {
   post_message: (message: WebviewMessage) => void;
-  config: Result<EclairScaConfig, string>,
+  config: Result<EclairScaConfig, string>;
+  dispatch_state: React.Dispatch<EclairStateAction>;
 }) {
   return (
     <div className="section">
@@ -19,6 +22,9 @@ export function CommandSection({
         </VscodeAlert>
       ) : null}
       <div className="grid-group-div command-actions">
+        <VscodeButton appearance="secondary" onClick={() => dispatch_state({ type: "reset-to-defaults" })}>
+          Restore Defaults
+        </VscodeButton>
         <VscodeButton appearance="secondary" disabled={"err" in config} onClick={() => {
           if ("err" in config) {
             console.error("Cannot apply configuration due to error:", config.err);

@@ -13,6 +13,37 @@ function is_record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+export function extract_yaml_from_ecl_content(ecl_text: string): string | undefined {
+  const lines = ecl_text.split(/\r?\n/);
+  const start_markers = new Set(["'meta", "'meta:", "'ECL", "'ECL:"]);
+  let start_index = -1;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    if (start_markers.has(lines[i].trim())) {
+      start_index = i + 1;
+      break;
+    }
+  }
+
+  if (start_index === -1) {
+    return undefined;
+  }
+
+  let end_index = -1;
+  for (let i = start_index; i < lines.length; i += 1) {
+    if (lines[i].trim() === "'") {
+      end_index = i;
+      break;
+    }
+  }
+
+  if (end_index === -1) {
+    return undefined;
+  }
+
+  return lines.slice(start_index, end_index).join("\n");
+}
+
 function parse_string(value: unknown, field: string): string {
   if (typeof value !== "string") {
     throw new Error(`Invalid template: ${field} must be a string`);
@@ -261,7 +292,9 @@ export function parse_eclair_template_from_any(data: unknown): EclairTemplate {
   const requires = parse_map(data.requires, "requires");
   const deps = parse_deps(data.deps);
   const options = parse_options(data.options);
-  const content = parse_content(data.content);
+  const content = data.content !== undefined && data.content !== null
+    ? parse_content(data.content)
+    : undefined;
 
   return {
     title,
@@ -276,10 +309,15 @@ export function parse_eclair_template_from_any(data: unknown): EclairTemplate {
   };
 }
 
-export function instantiate(
+type ResolvedFlags = {
+  flags: Map<string, boolean>;
+  flag_order: string[];
+};
+
+function resolve_flags(
   template: EclairTemplate,
   selected_options: Map<string, boolean>,
-): string {
+): ResolvedFlags {
   const flags = new Map<string, boolean>();
   const flag_order: string[] = [];
 
@@ -302,6 +340,23 @@ export function instantiate(
     }
     flags.set(flag_id, enabled);
   }
+
+  return { flags, flag_order };
+}
+
+export function format_flag_settings(
+  template: EclairTemplate,
+  selected_options: Map<string, boolean>,
+): string[] {
+  const { flags, flag_order } = resolve_flags(template, selected_options);
+  return flag_order.map((flag_id) => `set(${flag_id},${flags.get(flag_id) ? "1" : "nil"})`);
+}
+
+export function instantiate(
+  template: EclairTemplate,
+  selected_options: Map<string, boolean>,
+): string {
+  const { flags, flag_order } = resolve_flags(template, selected_options);
 
   const expand_condition = (condition: EclairTemplateCondition, env: Map<string, string>): EclairTemplateCondition => {
     switch (condition.kind) {
@@ -372,6 +427,9 @@ export function instantiate(
   };
 
   const base_env = new Map<string, string>();
+  if (!template.content) {
+    return "";
+  }
   return render_content(template.content, base_env);
 }
 

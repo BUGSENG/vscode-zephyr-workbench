@@ -1692,7 +1692,8 @@
     "react-dom": "^19.2.4",
     "sudo-prompt": "^9.2.1",
     "ts-pattern": "^5.9.0",
-    "yaml": "^2.4.3"
+    "yaml": "^2.4.3",
+    "zod": "^4.3.6"
   },
   "extensionDependencies": [
     "ms-vscode.cpptools",

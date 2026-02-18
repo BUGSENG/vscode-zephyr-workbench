@@ -8,7 +8,7 @@ export interface EclairTemplate {
   requires: Map<string, AnyDataValue>;
   deps: string[];
   options: EclairTemplateOption[];
-  content: EclairTemplateContent;
+  content?: EclairTemplateContent;
 }
 
 export type AnyDataValue = string | number | boolean | null | AnyDataValue[] | { [key: string]: AnyDataValue };
@@ -86,4 +86,3 @@ export type EclairTemplateCondition = {
   str: string;
   prefix: string;
 };
-

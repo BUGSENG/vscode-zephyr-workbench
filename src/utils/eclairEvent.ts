@@ -1,4 +1,4 @@
-import { EclairPresetTemplateSource, EclairScaConfig } from "./eclair/config";
+import { EclairPresetTemplateSource, EclairScaConfig, EclairScaMainConfig } from "./eclair/config";
 import { EclairTemplate, EclairTemplateKind } from "./eclair/template";
 
 
@@ -43,6 +43,10 @@ export type ExtensionMessage = {
   command: "template-path-picked",
   kind: EclairTemplateKind,
   path: string,
+} | {
+  // Restore the full saved SCA configuration into the webview
+  command: "set-sca-config",
+  config: EclairScaConfig,
 };
 
 // Commands sent FROM webview frontend TO extension backend
@@ -57,9 +61,6 @@ export type WebviewMessage = {
 } | {
   command: "browse-path",
   tool: string,
-} | {
-  command: "update-extra-config",
-  newPath: string,
 } | {
   command: "browse-extra-config",
 } | {

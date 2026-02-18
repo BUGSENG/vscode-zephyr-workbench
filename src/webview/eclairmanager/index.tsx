@@ -109,6 +109,7 @@ function EclairManagerPanel() {
       <CommandSection
         post_message={post_message}
         config={collected_config}
+        dispatch_state={dispatch_state}
       />
 
       <ReportViewerSection
@@ -173,6 +174,10 @@ function handleMessage(
     case "template-path-picked": {
       const { kind, path } = msg;
       dispatch({ type: "set-preset-path", kind, path });
+      break;
+    }
+    case "set-sca-config": {
+      dispatch({ type: "load-sca-config", config: msg.config });
       break;
     }
   }

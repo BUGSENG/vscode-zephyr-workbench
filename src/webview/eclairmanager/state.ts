@@ -1,4 +1,4 @@
-import { EclairPresetTemplateSource, PresetSelectionState } from "../../utils/eclair/config";
+import { EclairPresetTemplateSource, EclairScaConfig, PresetSelectionState } from "../../utils/eclair/config";
 import { EclairTemplate, EclairTemplateKind } from "../../utils/eclair/template";
 
 const default_install_path_placeholder = "Enter the tool's path if not in the global PATH";
@@ -150,6 +150,9 @@ export interface ReportServerState {
 
 
 export type EclairStateAction =
+  // Bulk actions
+  | { type: "reset-to-defaults" }
+  | { type: "load-sca-config"; config: EclairScaConfig }
   // Toggle actions
   | { type: "toggle-install-path-editing" }
   | { type: "toggle-user-ruleset-name-editing" }
@@ -181,9 +184,55 @@ export type EclairStateAction =
   | { type: "set-preset-path"; kind: EclairTemplateKind; path: string }
   | { type: "set-or-add-preset"; kind: EclairTemplateKind; source: EclairPresetTemplateSource; };
 
+function build_analysis_configuration_from_config(cfg: EclairScaConfig): AnalysisConfigurationState {
+  switch (cfg.config.type) {
+    case "zephyr-ruleset":
+      return {
+        type: "zephyr-ruleset",
+        ruleset: {
+          selected: cfg.config.ruleset,
+          userRulesetName: cfg.config.userRulesetName ?? "",
+          userRulesetNameEditing: false,
+          userRulesetPath: cfg.config.userRulesetPath ?? "",
+          userRulesetPathEditing: false,
+        },
+      };
+    case "custom-ecl":
+      return {
+        type: "custom-ecl",
+        state: { ecl: cfg.config.ecl_path },
+      };
+    case "preset": {
+      const toPreset = (p: PresetSelectionState) => ({ source: p.source, edited_flags: { ...p.edited_flags } });
+      return {
+        type: "preset",
+        state: {
+          ruleset_state: { preset: toPreset(cfg.config.ruleset), edit_path: "" },
+          variants_state: { presets: cfg.config.variants.map(toPreset), edit_path: "" },
+          tailorings_state: { presets: cfg.config.tailorings.map(toPreset), edit_path: "" },
+        },
+      };
+    }
+  }
+}
+
 export function eclairReducer(state: EclairState, action: EclairStateAction): EclairState {
   console.log("action: ", action);
   switch (action.type) {
+    case "reset-to-defaults":
+      // Preserve live status/install-path (managed by the probe, not stored config)
+      return default_eclair_state();
+
+    case "load-sca-config": {
+      const cfg = action.config;
+      return {
+        ...state,
+        analysis_configuration: build_analysis_configuration_from_config(cfg),
+        extra_config: { path: cfg.extra_config ?? "" },
+        reports: { selected: cfg.reports && cfg.reports.length > 0 ? [...cfg.reports] : ["ALL"] },
+      };
+    }
+
     case "toggle-install-path-editing":
       return {
         ...state,

@@ -16,10 +16,6 @@ export function ExtraConfigSection(props: {
         placeholder="path/to/config"
         on_selected={(newPath) => {
           props.dispatch_state({ type: "update-extra-config-path", path: newPath });
-          props.post_message({
-            command: "update-extra-config",
-            newPath: newPath.trim(),
-          });
         }}
         on_pick={() => props.post_message({ command: "browse-extra-config" })}
       />
