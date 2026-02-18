@@ -29,6 +29,9 @@ export type ExtensionMessage = {
   command: "set-user-ruleset-path",
   path: string,
 } | {
+  command: "set-custom-ecl-path",
+  path: string,
+} | {
   command: "report-server-started",
 } | {
   command: "report-server-stopped",
@@ -61,6 +64,8 @@ export type WebviewMessage = {
   command: "browse-extra-config",
 } | {
   command: "browse-user-ruleset-path",
+} | {
+  command: "browse-custom-ecl-path",
 } | {
   command: "save-sca-config",
   config: EclairScaConfig,

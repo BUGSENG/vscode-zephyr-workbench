@@ -161,6 +161,7 @@ export type EclairStateAction =
   | { type: "update-ruleset-selection"; ruleset: string }
   | { type: "update-user-ruleset-name"; name: string }
   | { type: "update-user-ruleset-path"; path: string }
+  | { type: "update-custom-ecl-path"; path: string }
   | { type: "toggle-report"; report: string; checked: boolean }
   // Message-based actions
   | { type: "toggle-spinner"; show: boolean }
@@ -170,6 +171,7 @@ export type EclairStateAction =
   | { type: "set-path-status"; text: string }
   | { type: "set-user-ruleset-name"; name: string }
   | { type: "set-user-ruleset-path"; path: string }
+  | { type: "set-custom-ecl-path"; path: string }
   | { type: "report-server-started" }
   | { type: "report-server-stopped" }
   | { type: "set-preset-flag"; source: EclairPresetTemplateSource; flagId: string; value: boolean }
@@ -311,6 +313,22 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
         }
       };
     
+    case "update-custom-ecl-path":
+      if (state.analysis_configuration === null || state.analysis_configuration.type !== "custom-ecl") {
+        console.error("Cannot update custom ECL path: configuration is not custom-ecl type");
+        return state;
+      }
+      return {
+        ...state,
+        analysis_configuration: {
+          ...state.analysis_configuration,
+          state: {
+            ...state.analysis_configuration.state,
+            ecl: action.path
+          }
+        }
+      };
+    
     case "toggle-report": {
       let newReports = [...state.reports.selected];
       
@@ -403,6 +421,22 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
             ...ruleset7,
             userRulesetPath: action.path,
             userRulesetPathEditing: false
+          }
+        }
+      };
+    
+    case "set-custom-ecl-path":
+      if (state.analysis_configuration === null || state.analysis_configuration.type !== "custom-ecl") {
+        console.error("Cannot set custom ECL path: configuration is not custom-ecl type");
+        return state;
+      }
+      return {
+        ...state,
+        analysis_configuration: {
+          ...state.analysis_configuration,
+          state: {
+            ...state.analysis_configuration.state,
+            ecl: action.path
           }
         }
       };

@@ -869,6 +869,25 @@ export class EclairManagerPanel {
           }
           break;
         }
+        case "browse-custom-ecl-path": {
+          const folderUri = this.resolveApplicationFolderUri();
+          const pick = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            defaultUri: folderUri,
+            title: "Select custom ECL configuration file",
+            filters: {
+              "ECL file": ["ecl"],
+              "All files": ["*"]
+            }
+          });
+          if (pick && pick[0]) {
+            const chosen = pick[0].fsPath.trim();
+            post_message({ command: "set-custom-ecl-path", path: chosen });
+          }
+          break;
+        }
         case "start-report-server": {
           await this.startReportServer();
           break;

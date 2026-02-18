@@ -155,6 +155,10 @@ function handleMessage(
       const path = String(msg.path ?? "");
       dispatch({ type: "set-user-ruleset-path", path });
       break;
+    case "set-custom-ecl-path":
+      const eclPath = String(msg.path ?? "");
+      dispatch({ type: "set-custom-ecl-path", path: eclPath });
+      break;
     case "report-server-started":
       dispatch({ type: "report-server-started" });
       break;
