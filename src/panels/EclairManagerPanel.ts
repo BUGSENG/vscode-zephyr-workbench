@@ -11,12 +11,13 @@ import { getExtraPaths, normalizePath, setExtraPath } from "../utils/envYamlUtil
 import type { IEclairExtension } from "../ext/eclair_api";
 import type { ExtensionMessage, WebviewMessage } from "../utils/eclairEvent";
 import { extract_yaml_from_ecl_content, parse_eclair_template_from_any } from "../utils/eclair/template_utils";
-import { EclairPresetTemplateSource, EclairScaConfig } from "../utils/eclair/config";
+import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig } from "../utils/eclair/config";
 import { build_cmake_args } from "./EclairManagerPanel/eclair_cmake_args";
 import { ensureRepoCheckout } from "./EclairManagerPanel/repo_manage";
 import { Result } from "../utils/typing_utils";
 import { EclairTemplate } from "../utils/eclair/template";
 import { match } from "ts-pattern";
+import { load_preset_from_path, load_preset_from_ref, load_preset_from_repo } from "./EclairManagerPanel/templates";
 
 export class EclairManagerPanel {
   /**
@@ -845,26 +846,18 @@ export class EclairManagerPanel {
       })
       .with({ command: "start-report-server" }, async () => this.startReportServer())
       .with({ command: "stop-report-server" }, async () => this.stopReportServer())
-      .with({ command: "load-preset-from-path" }, ({ path: presetPath }) => {
-        load_preset_from_path_and_notify(presetPath, this.post_message.bind(this));
-      })
-      .with({ command: "load-preset-from-repo" }, async ({ name, path: repoPath }) => {
-        // Look up origin & ref from the stored config — the webview only knows
-        // the logical name and the relative file path.
-        const folderUri = this.resolveApplicationFolderUri();
-        const wsCfg = folderUri ? vscode.workspace.getConfiguration(undefined, folderUri) : undefined;
-        const wsCfgs = wsCfg?.get<any[]>("zephyr-workbench.build.configurations") ?? [];
-        const activeIdx2 = wsCfgs.findIndex((c: any) => c?.active === true || c?.active === "true");
-        const cfgIdx = activeIdx2 >= 0 ? activeIdx2 : 0;
-        const scaCfgRaw = wsCfgs[cfgIdx]?.sca?.[0]?.cfg;
-        const repos = (scaCfgRaw?.repos ?? {}) as Record<string, { origin: string; ref: string }>;
-        const entry = repos[name];
-        if (!entry) {
-          const src: EclairPresetTemplateSource = { type: "repo-path", repo: name, path: repoPath };
-          this.post_message({ command: "preset-content", source: src, template: { error: `Repository '${name}' not found in repos configuration.` } });
-          return;
+      .with({ command: "load-preset" }, async ({ source, repos }) => {
+        let r = await load_preset_from_ref(
+          source,
+          repos,
+          (message) => this.post_message({ command: "preset-content", source, template: { loading: message } }),
+        );
+
+        if ("err" in r) {
+          this.post_message({ command: "preset-content", source, template: { error: r.err } });
+        } else {
+          this.post_message({ command: "preset-content", source, template: r.ok });
         }
-        load_preset_from_repo(name, entry.origin, entry.ref, repoPath, this.post_message.bind(this));
       })
       .with({ command: "scan-repo" }, ({ name, origin, ref }) => {
         // Immediately check out the repo and scan all .ecl files, sending
@@ -935,9 +928,17 @@ export class EclairManagerPanel {
         const { ruleset, variants, tailorings } = parsed.data.config;
         const allPresets = [ruleset, ...variants, ...tailorings];
         for (const p of allPresets) {
-          if (p?.source?.type === "system-path" && p.source.path) {
-            load_preset_from_path_and_notify(p.source.path, post_message);
-          }
+          await load_preset_from_ref(
+            p.source,
+            parsed.data.repos ?? {},
+            (message) => post_message({ command: "preset-content", source: p.source, template: { loading: message } }),
+          ).then(r => {
+            if ("err" in r) {
+              post_message({ command: "preset-content", source: p.source, template: { error: r.err } });
+            } else {
+              post_message({ command: "preset-content", source: p.source, template: r.ok });
+            }
+          });
         }
       }
 
@@ -1126,133 +1127,20 @@ export class EclairManagerPanel {
   post_message(m: ExtensionMessage) {
     this._panel.webview.postMessage(m);
   }
-}
 
-async function load_preset_from_path_and_notify(
-  preset_path: string,
-  post_message: (m: ExtensionMessage) => void,
-) {
-  let r = await load_preset_from_path(preset_path, (message) => {
-    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { loading: message } });
-  });
+  get_repos(): EclairRepos {
+    // Look up origin & ref from the stored config — the webview only knows
+    // the logical name and the relative file path.
+    const folderUri = this.resolveApplicationFolderUri();
+    const wsCfg = folderUri ? vscode.workspace.getConfiguration(undefined, folderUri) : undefined;
+    const wsCfgs = wsCfg?.get<any[]>("zephyr-workbench.build.configurations") ?? [];
+    const activeIdx2 = wsCfgs.findIndex((c: any) => c?.active === true || c?.active === "true");
+    const cfgIdx = activeIdx2 >= 0 ? activeIdx2 : 0;
+    const scaCfgRaw = wsCfgs[cfgIdx]?.sca?.[0]?.cfg;
+    const repos = (scaCfgRaw?.repos ?? {}) as Record<string, { origin: string; ref: string }>;
 
-  if ("err" in r) {
-    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: { error: r.err } });
-  } else {
-    post_message({ command: "preset-content", source: { type: "system-path", path: preset_path }, template: r.ok });
+    return repos;
   }
-}
-
-export async function load_preset_from_path(
-  preset_path: string,
-  on_progress: (message: string) => void,
-): Promise<Result<EclairTemplate, string>> {
-  preset_path = preset_path.trim();
-  if (!preset_path) {
-    return { err: "Invalid preset path." };
-  }
-
-  on_progress("Reading file...");
-  let content: string;
-  try {
-    content = await fs.promises.readFile(preset_path, { encoding: "utf8" });
-  } catch (err: any) {
-    return { err: `Failed to read preset: ${err?.message || err}` };
-  }
-
-  on_progress("Parsing file...");
-  const yaml_content = extract_yaml_from_ecl_content(content);
-  if (yaml_content === undefined) {
-    return { err: "The selected file does not contain valid ECL template content." };
-  }
-
-  let data: any;
-  try {
-    data = yaml.parse(yaml_content);
-  } catch (err: any) {
-    return { err: `Failed to parse preset: ${err?.message || err}` };
-  }
-
-  on_progress("Validating file...");
-  let template: EclairTemplate;
-  try {
-    template = parse_eclair_template_from_any(data);
-  } catch (err: any) {
-    return { err: `Invalid preset content: ${err?.message || err}` };
-  }
-
-  return { ok: template };
-}
-
-/**
- * Loads a single preset file from a named repository.
- * `origin` and `ref` are internal parameters used by `ensureRepoCheckout`;
- * they do NOT appear in the `repo-path` source emitted to the webview.
- *
- * @param name Logical repo name (matches EclairScaConfig.repos key).
- * @param origin Git remote URL (internal only).
- * @param ref Branch, tag, or commit SHA (internal only).
- * @param filePath Preset file path relative to the repository root.
- * @param post_message Webview message poster.
- */
-async function load_preset_from_repo(
-  name: string,
-  origin: string,
-  ref: string,
-  filePath: string,
-  post_message: (m: ExtensionMessage) => void,
-): Promise<void> {
-  const source: EclairPresetTemplateSource = { type: "repo-path", repo: name, path: filePath };
-
-  post_message({ command: "preset-content", source, template: { loading: "cloning repository" } });
-
-  let checkoutDir: string;
-  try {
-    checkoutDir = await ensureRepoCheckout(name, origin, ref);
-  } catch (err: any) {
-    post_message({ command: "preset-content", source, template: { error: `Failed to checkout repository: ${err?.message || err}` } });
-    return;
-  }
-
-  const absolutePath = path.join(checkoutDir, filePath);
-
-  post_message({ command: "preset-content", source, template: { loading: "reading file" } });
-
-  let content: string;
-  try {
-    content = await fs.promises.readFile(absolutePath, { encoding: "utf8" });
-  } catch (err: any) {
-    post_message({ command: "preset-content", source, template: { error: `Failed to read file '${filePath}' from repo '${name}': ${err?.message || err}` } });
-    return;
-  }
-
-  post_message({ command: "preset-content", source, template: { loading: "parsing file" } });
-
-  const yaml_content = extract_yaml_from_ecl_content(content);
-  if (yaml_content === undefined) {
-    post_message({ command: "preset-content", source, template: { error: "The file does not contain valid ECL template content." } });
-    return;
-  }
-
-  let data: any;
-  try {
-    data = yaml.parse(yaml_content);
-  } catch (err: any) {
-    post_message({ command: "preset-content", source, template: { error: `Failed to parse preset: ${err?.message || err}` } });
-    return;
-  }
-
-  post_message({ command: "preset-content", source, template: { loading: "validating file" } });
-
-  let template: any;
-  try {
-    template = parse_eclair_template_from_any(data);
-  } catch (err: any) {
-    post_message({ command: "preset-content", source, template: { error: `Invalid preset content: ${err?.message || err}` } });
-    return;
-  }
-
-  post_message({ command: "preset-content", source, template });
 }
 
 /**

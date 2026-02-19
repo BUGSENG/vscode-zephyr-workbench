@@ -1,4 +1,4 @@
-import { EclairPresetTemplateSource, EclairScaConfig, EclairScaMainConfig } from "./eclair/config";
+import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig, EclairScaMainConfig } from "./eclair/config";
 import { EclairTemplate, EclairTemplateKind } from "./eclair/template";
 
 
@@ -91,19 +91,9 @@ export type WebviewMessage = {
 } | {
   command: "request-trial",
 } | {
-  command: "load-preset-from-path",
-  path: string,
-} | {
-  /**
-   * Ask the backend to load a single preset file from a named repository entry.
-   * The backend looks up origin and rev from EclairScaConfig.repos[name], so
-   * those are NOT repeated here.
-   */
-  command: "load-preset-from-repo",
-  /** Logical repo name — must match a key in EclairScaConfig.repos. */
-  name: string,
-  /** File path relative to the repository root. */
-  path: string,
+  command: "load-preset",
+  source: EclairPresetTemplateSource,
+  repos: EclairRepos,
 } | {
   command: "pick-preset-path",
   kind: EclairTemplateKind,

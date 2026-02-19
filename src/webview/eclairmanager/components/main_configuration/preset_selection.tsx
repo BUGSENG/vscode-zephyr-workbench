@@ -301,7 +301,7 @@ function PresetPicker(props: {
       placeholder="Path to analysis_<RULESET>.<ecl|yaml>"
       on_selected={(path) => {
         props.dispatch_state({ type: "set-or-add-preset", kind: props.kind, source: { type: "system-path", path } });
-        props.post_message({ command: "load-preset-from-path", path });
+        props.post_message({ command: "load-preset", source: { type: "system-path", path }, repos: {} });
         props.onPresetSelected?.();
       }}
       on_pick={() => {
