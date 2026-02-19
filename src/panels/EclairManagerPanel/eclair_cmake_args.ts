@@ -80,10 +80,10 @@ export function build_cmake_args(cfg: EclairScaConfig): string[] {
 
         let content = "";
 
-        for (const opt of additional_eclair_options) {
-          const escaped_opt = opt.replace(/"/g, '\\"');
-          content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "${escaped_opt}")\n`;
-        }
+        //for (const opt of additional_eclair_options) {
+        //  const escaped_opt = opt.replace(/"/g, '\\"');
+        //  content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "${escaped_opt}")\n`;
+        //}
 
         content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "-eval_file=${filePath}")\n`;
         fs.writeFileSync(wrapperPath, content, { encoding: "utf8" });

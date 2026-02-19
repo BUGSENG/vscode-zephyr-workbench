@@ -124,3 +124,10 @@ export async function ensureRepoCheckout(name: string, origin: string, ref: stri
 
   return checkoutDir;
 }
+
+export async function deleteRepoCheckout(origin: string, ref: string): Promise<void> {
+  const checkoutDir = get_checkout_dir(origin, ref);
+  if (fs.existsSync(checkoutDir)) {
+    await fs.promises.rm(checkoutDir, { recursive: true, force: true });
+  }
+}

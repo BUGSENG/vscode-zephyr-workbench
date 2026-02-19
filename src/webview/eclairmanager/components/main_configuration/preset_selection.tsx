@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
 import { AvailablePresetsState, BUGSENG_REPO_LINK, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetsSelectionState, RepoScanState, SinglePresetSelectionState } from "../../state";
-import { PickPath, SearchableDropdown, SearchableItem, StatusBadge, StatusBadgeState, VscodeAlert, VscodeButton, VscodeCheckbox, VscodePanel, SimpleHelpTooltip, RichHelpTooltip, VscodeTextField } from "../vscode";
+import { PickPath, SearchableDropdown, SearchableItem, StatusBadge, StatusBadgeState, VscodeAlert, VscodeBadge, VscodeButton, VscodeCheckbox, VscodePanel, SimpleHelpTooltip, RichHelpTooltip, VscodeTextField, Monospace } from "../vscode";
 import { EclairTemplate, EclairTemplateKind, EclairTemplateOption } from "../../../../utils/eclair/template";
 import { EclairPresetTemplateSource, EclairRepos, PresetSelectionState } from "../../../../utils/eclair/config";
 import { RepoManagementSection } from "./preset_selection/repo_management";
@@ -276,7 +276,7 @@ function PresetPicker(props: {
     backgroundColor: 'var(--vscode-editor-background)'
   }}>
     <div style={{ marginBottom: '10px', fontSize: '0.9em', color: 'var(--vscode-descriptionForeground)' }}>
-      You can either select one of the available presets below, or provide a custom preset by specifying the path to a <code>.ecl</code> or <code>.yaml</code> file.
+      You can either select one of the available presets below, or provide a custom preset by specifying the path to a <Monospace>.ecl</Monospace> or <Monospace>.yaml</Monospace> file.
     </div>
 
     <SearchableDropdown
@@ -294,7 +294,7 @@ function PresetPicker(props: {
     />
 
     <div style={{ marginTop: '10px' }}>
-      Or provide a custom preset by specifying the path to a <code>.ecl</code> or <code>.yaml</code> file:
+      Or provide a custom preset by specifying the path to a <Monospace>.ecl</Monospace> or <Monospace>.yaml</Monospace> file:
     </div>
     <PickPath
       value={props.edit_path}
@@ -317,11 +317,11 @@ function EclairPresetTemplateSourceDisplay({
   source: EclairPresetTemplateSource;
 }) {
   if (source.type === "system-path") {
-    return <>Path: <code>{source.path}</code></>;
+    return <>Path: <Monospace>{source.path}</Monospace></>;
   } else {
     return (
       <>
-        Repo <code>{source.repo}</code>: <code>{source.path}</code>
+        Repo <Monospace>{source.repo}</Monospace>: <Monospace>{source.path}</Monospace>
       </>
     );
   }
@@ -343,12 +343,13 @@ function PresetSettings({
     {template.options.length > 0 && (
       <details style={{ marginTop: "8px" }}>
         <summary style={{ cursor: "pointer", userSelect: "none" }}>
-          Options ({template.options.length})
+          Options
         </summary>
         <div style={{ 
           marginTop: "8px", 
           maxHeight: "20em", 
           overflowY: "auto", 
+          overflowX: "hidden",
           border: "1px solid var(--vscode-panel-border)", 
           padding: "8px", 
           borderRadius: "4px",
@@ -379,6 +380,15 @@ function PresetSettings({
   </div>);
 }
 
+function collectFlagIds(option: EclairTemplateOption): string[] {
+  if (option.variant.kind === "flag") {
+    return [option.id];
+  } else if (option.variant.kind === "group") {
+    return option.variant.children.flatMap(collectFlagIds);
+  }
+  return [];
+}
+
 function TemplateOptionTree({
   option,
   level = 0,
@@ -400,6 +410,10 @@ function TemplateOptionTree({
     marginBottom: "4px",
   };
 
+  const modified_star = (<span style={{ marginLeft: "6px", color: "var(--vscode-descriptionForeground)" }}>
+    *
+  </span>);
+
   switch (option.variant.kind) {
     case "flag": {
       const defaultValue = option.variant.default ?? false;
@@ -414,15 +428,15 @@ function TemplateOptionTree({
               checked={checked}
               onChange={(e: any) => onSetFlag(option.id, !!e.target.checked)}
             >
-              {option.title || option.id}
-              {isEdited && (
-                <span style={{ marginLeft: "6px", color: "var(--vscode-descriptionForeground)" }}>
-                  *
-                </span>
-              )}
+              <span style={{
+                fontFamily: "var(--vscode-editor-font-family)",
+              }}>
+                {option.id}
+              </span>
+              {isEdited && modified_star}
               {option.title && option.title !== option.id && (
                 <span style={{ marginLeft: "8px", color: "var(--vscode-descriptionForeground)", fontSize: "0.9em" }}>
-                  ({option.id})
+                  ({option.title})
                 </span>
               )}
             </VscodeCheckbox>
@@ -445,6 +459,9 @@ function TemplateOptionTree({
       );
     }
     case "group": {
+      const allFlagIds = option.variant.children.flatMap(collectFlagIds);
+      const any_modified = allFlagIds.some((id) => editedFlags[id] !== undefined);
+
       return (
         <div style={indentStyle}>
           <div
@@ -466,9 +483,38 @@ function TemplateOptionTree({
                 ({option.id})
               </span>
             )}
-            <span style={{ marginLeft: "8px", color: "var(--vscode-descriptionForeground)", fontSize: "0.85em" }}>
-              [{option.variant.children.length} {option.variant.children.length === 1 ? "option" : "options"}]
-            </span>
+            {any_modified && modified_star}
+            <VscodeBadge style={{ marginLeft: "8px" }}>{allFlagIds.length}</VscodeBadge>
+            <div
+              style={{ marginLeft: "12px", display: "flex", gap: "4px" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="inline-icon-button"
+                title="Enable all"
+                style={{ fontSize: "0.8em", padding: "1px 6px" }}
+                onClick={() => allFlagIds.forEach((id) => onSetFlag(id, true))}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="inline-icon-button"
+                title="Disable all"
+                style={{ fontSize: "0.8em", padding: "1px 6px" }}
+                onClick={() => allFlagIds.forEach((id) => onSetFlag(id, false))}
+              >
+                -
+              </button>
+              <button
+                type="button"
+                className="inline-icon-button codicon codicon-discard"
+                title="Reset all to default"
+                style={{ fontSize: "0.8em", padding: "1px 6px" }}
+                onClick={() => allFlagIds.forEach((id) => onClearFlag(id))}
+              />
+            </div>
           </div>
           {expanded && (
             <div>

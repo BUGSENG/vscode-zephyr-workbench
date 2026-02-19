@@ -91,6 +91,12 @@ export function RepoManagementSection(props: {
             props.dispatch_state({ type: "repo-scan-started", name });
             props.post_message({ command: "scan-repo", name, origin: entry.origin, ref: entry.ref });
           }}
+          handle_update={(name: string) => {
+            const entry = props.repos[name];
+            if (!entry) { return; }
+            props.dispatch_state({ type: "repo-scan-started", name });
+            props.post_message({ command: "update-repo-checkout", name, origin: entry.origin, ref: entry.ref });
+          }}
           handle_edit_start={(name: string) => {
             const entry = props.repos[name];
             set_editing_name(name);
@@ -126,6 +132,7 @@ function ReposTable({
   repos_scan_state,
   available_presets,
   handle_reload,
+  handle_update,
   handle_edit_start,
   handle_remove,
 }: {
@@ -133,6 +140,7 @@ function ReposTable({
   repos_scan_state: Record<string, RepoScanState>;
   available_presets: AvailablePresetsState;
   handle_reload: (name: string) => void;
+  handle_update: (name: string) => void;
   handle_edit_start: (name: string) => void;
   handle_remove: (name: string) => void;
 }) {
@@ -160,11 +168,20 @@ function ReposTable({
               <VscodeButton
                 appearance="secondary"
                 onClick={() => handle_reload(name)}
-                title="Re-scan this repository for preset templates"
+                title="Re-scan this repository for preset templates (uses cached checkout)"
                 style={{ marginRight: "4px" }}
                 disabled={repos_scan_state[name]?.status === "loading"}
               >
                 Reload
+              </VscodeButton>
+              <VscodeButton
+                appearance="secondary"
+                onClick={() => handle_update(name)}
+                title="Delete the cached checkout and re-clone from remote to get the latest changes"
+                style={{ marginRight: "4px" }}
+                disabled={repos_scan_state[name]?.status === "loading"}
+              >
+                Update
               </VscodeButton>
               <VscodeButton
                 appearance="secondary"

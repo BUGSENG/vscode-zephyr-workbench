@@ -13,7 +13,7 @@ import type { ExtensionMessage, WebviewMessage } from "../utils/eclairEvent";
 import { extract_yaml_from_ecl_content, parse_eclair_template_from_any } from "../utils/eclair/template_utils";
 import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig } from "../utils/eclair/config";
 import { build_cmake_args } from "./EclairManagerPanel/eclair_cmake_args";
-import { ensureRepoCheckout } from "./EclairManagerPanel/repo_manage";
+import { ensureRepoCheckout, deleteRepoCheckout } from "./EclairManagerPanel/repo_manage";
 import { Result } from "../utils/typing_utils";
 import { EclairTemplate } from "../utils/eclair/template";
 import { match } from "ts-pattern";
@@ -856,12 +856,24 @@ export class EclairManagerPanel {
         if ("err" in r) {
           this.post_message({ command: "preset-content", source, template: { error: r.err } });
         } else {
-          this.post_message({ command: "preset-content", source, template: r.ok });
+          this.post_message({ command: "preset-content", source, template: r.ok[0] });
         }
       })
       .with({ command: "scan-repo" }, ({ name, origin, ref }) => {
         // Immediately check out the repo and scan all .ecl files, sending
         // back preset-content messages so the webview picker is updated.
+        scanAllRepoPresets(name, origin, ref, this.post_message.bind(this));
+      })
+      .with({ command: "update-repo-checkout" }, async ({ name, origin, ref }) => {
+        const out = getOutputChannel();
+        out.appendLine(`[EclairManagerPanel] Deleting cached checkout for '${name}' to force update...`);
+        try {
+          await deleteRepoCheckout(origin, ref);
+        } catch (err: any) {
+          out.appendLine(`[EclairManagerPanel] Failed to delete checkout for '${name}': ${err}`);
+          this.post_message({ command: "repo-scan-failed", name, message: err?.message || String(err) });
+          return;
+        }
         scanAllRepoPresets(name, origin, ref, this.post_message.bind(this));
       })
       .with({ command: "pick-preset-path" }, async ({ kind }) => {
@@ -936,7 +948,7 @@ export class EclairManagerPanel {
             if ("err" in r) {
               post_message({ command: "preset-content", source: p.source, template: { error: r.err } });
             } else {
-              post_message({ command: "preset-content", source: p.source, template: r.ok });
+              post_message({ command: "preset-content", source: p.source, template: r.ok[0] });
             }
           });
         }

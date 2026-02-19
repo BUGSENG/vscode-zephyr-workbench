@@ -31,6 +31,10 @@ export function VscodeOption(props: any) {
   return React.createElement("vscode-option", props, props.children);
 }
 
+export function VscodeBadge(props: any) {
+  return React.createElement("vscode-badge", props, props.children);
+}
+
 export function VscodePanel(props: {
   children: React.ReactNode;
   style?: React.CSSProperties;
@@ -427,4 +431,12 @@ export function PickPath({
       </VscodeButton>
     )}
   </div>);
+}
+
+export function Monospace(props: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <span style={{ fontFamily: "var(--vscode-editor-font-family)", ...props.style }}>
+      {props.children}
+    </span>
+  );
 }

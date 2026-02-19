@@ -108,4 +108,9 @@ export type WebviewMessage = {
   name: string,
   origin: string,
   ref: string,
+} | {
+  command: "update-repo-checkout",
+  name: string,
+  origin: string,
+  ref: string,
 };
