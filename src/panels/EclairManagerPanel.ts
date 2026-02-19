@@ -707,8 +707,8 @@ export class EclairManagerPanel {
                 cfg.extra_config,
                 cfg.reports,
                 app_dir,
-                board,
                 build_dir,
+                board,
               );
             })
             .with({ type: "custom-ecl" }, (c) => {
@@ -725,8 +725,8 @@ export class EclairManagerPanel {
                 cfg.extra_config,
                 cfg.reports,
                 app_dir,
-                board,
                 build_dir,
+                board,
               );
             })
             .with({ type: "zephyr-ruleset" }, (c) => {
@@ -738,8 +738,8 @@ export class EclairManagerPanel {
                 cfg.extra_config,
                 cfg.reports,
                 app_dir,
-                board,
                 build_dir,
+                board,
               );
             })
             .exhaustive();
@@ -1331,7 +1331,7 @@ function build_analysis_command(
       "-DZEPHYR_SCA_VARIANT=eclair",
       ...cmake_compiler_launcher_options(),
       ...cmake_ruleset_selection_options(ruleset, user_ruleset_name, user_ruleset_path),
-      ...(extra_config ? cmake_extra_config_options(eclair_options, extra_config.trim()) : []),
+      ...cmake_extra_config_options(eclair_options, extra_config?.trim()),
       ...cmake_reports_options(reports),
     ];
 
@@ -1393,38 +1393,39 @@ function cmake_ruleset_selection_options(
 
 function cmake_extra_config_options(
   eclair_options: string[],
-  extra_config: string,
+  extra_config: string | undefined,
 ) {
-  if (
-    !extra_config ||
-    extra_config === "Checking" ||
-    extra_config === "Not Found" ||
-    !fs.existsSync(extra_config) ||
-    fs.statSync(extra_config).isDirectory()
-  ) {
-    return [];
+  // .ecl file needs a wrapper that uses -eval_file
+  const wrapperPath = path.join(os.tmpdir(), "eclair_wrapper.cmake");
+
+  let content = "";
+
+  for (const opt of eclair_options) {
+    const escaped_opt = opt.replace(/"/g, '\\"');
+    content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "${escaped_opt}")\n`;
   }
 
-  const ext = path.extname(extra_config).toLowerCase();
-  const filePath = extra_config.replace(/\\/g, "/");
+  if (
+    extra_config &&
+    extra_config !== "Checking" &&
+    extra_config !== "Not Found" &&
+    fs.existsSync(extra_config) &&
+    !fs.statSync(extra_config).isDirectory()
+  ) {
+    const ext = path.extname(extra_config).toLowerCase();
+    const file_path = extra_config.replace(/\\/g, "/");
 
-  let finalPath = filePath;
-  if (ext === ".ecl" || ext === ".eclair") {
-    // .ecl file needs a wrapper that uses -eval_file
-    const wrapperPath = path.join(os.tmpdir(), "eclair_wrapper.cmake");
-
-    let content = "";
-
-    for (const opt of eclair_options) {
-      const escaped_opt = opt.replace(/"/g, '\\"');
-      content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "${escaped_opt}")\n`;
+    if (ext !== ".ecl" && ext !== ".eclair") {
+      throw new Error(`Unsupported file extension: ${ext}`);
     }
 
-    content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "-eval_file=${filePath}")\n`;
-    fs.writeFileSync(wrapperPath, content, { encoding: "utf8" });
-    finalPath = wrapperPath.replace(/\\/g, "/");
+    content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "-eval_file=${file_path}")\n`;
   }
-  return [`-DECLAIR_OPTIONS_FILE=${finalPath}`];
+
+  fs.writeFileSync(wrapperPath, content, { encoding: "utf8" });
+  const final_path = wrapperPath.replace(/\\/g, "/");
+
+  return [`-DECLAIR_OPTIONS_FILE=${final_path}`];
 }
 
 function cmake_reports_options(reports: string[] | undefined) {
@@ -1460,10 +1461,12 @@ function create_fake_user_ruleset() {
   const fake_name = "dummy";
   const fake_ecl = path.join(fake_path, `analysis_${fake_name}.ecl`);
 
-  if (!fs.existsSync(fake_ecl)) {
-    fs.mkdirSync(fake_path, { recursive: true });
-    fs.writeFileSync(fake_ecl, `ruleset: ${fake_name}\n`, { encoding: "utf8" });
+  if (fs.existsSync(fake_path)) {
+    fs.rmSync(fake_path, { recursive: true });
   }
+
+  fs.mkdirSync(fake_path, { recursive: true });
+  fs.writeFileSync(fake_ecl, "", { encoding: "utf8" });
 
   return {
     user_ruleset_name: fake_name,
