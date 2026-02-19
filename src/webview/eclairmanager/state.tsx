@@ -54,6 +54,11 @@ export function default_eclair_state(): EclairState {
         origin: BUGSENG_REPO_URL,
         ref: "main",
       },
+      "invalid": {
+        // TODO remove this example
+        origin: "https://example.com/repo.git",
+        ref: "deadbeef",
+      },
     },
     repos_scan_state: {},
     available_presets: {
