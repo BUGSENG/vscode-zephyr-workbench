@@ -6,15 +6,14 @@ import yaml from "yaml";
 import { getNonce } from "../utilities/getNonce";
 import { getUri } from "../utilities/getUri";
 import { execCommandWithEnv, execShellCommandWithEnv, getOutputChannel, classifyShell, getShellExe, concatCommands } from "../utils/execUtils";
-import { getInternalDirRealPath } from "../utils/utils";
+import { getInternalDirRealPath, getZephyrSDK } from "../utils/utils";
 import { getExtraPaths, normalizePath, setExtraPath } from "../utils/envYamlUtils";
 import type { IEclairExtension } from "../ext/eclair_api";
 import type { ExtensionMessage, WebviewMessage } from "../utils/eclairEvent";
-import { extract_yaml_from_ecl_content, parse_eclair_template_from_any } from "../utils/eclair/template_utils";
-import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig } from "../utils/eclair/config";
-import { build_cmake_args } from "./EclairManagerPanel/eclair_cmake_args";
+import { extract_yaml_from_ecl_content, format_flag_settings, parse_eclair_template_from_any } from "../utils/eclair/template_utils";
+import { ALL_ECLAIR_REPORTS, EclairPresetTemplateSource, EclairRepos, EclairScaConfig, EclairScaZephyrRulesetConfig, PresetSelectionState } from "../utils/eclair/config";
 import { ensureRepoCheckout, deleteRepoCheckout } from "./EclairManagerPanel/repo_manage";
-import { Result } from "../utils/typing_utils";
+import { Result, unwrap_or_throw } from "../utils/typing_utils";
 import { EclairTemplate } from "../utils/eclair/template";
 import { match } from "ts-pattern";
 import { load_preset_from_path, load_preset_from_ref, load_preset_from_repo } from "./EclairManagerPanel/templates";
@@ -49,6 +48,7 @@ export class EclairManagerPanel {
     return walk(obj);
   }
 
+  // TODO: deepResolvePaths is a blunt recursive replacement, replace with targeted field handling.
   /**
    * Recursively walks `obj` and expands `${workspaceFolder}` in every string
    * to the actual workspace folder path.
@@ -153,6 +153,7 @@ export class EclairManagerPanel {
       vscode.window.showErrorMessage("ECLAIR is not installed. Please install ECLAIR and try again.");
     }
   }
+
   /**
    * Detects the Zephyr SDK installation directory from common environment variables and paths.
    */
@@ -674,133 +675,90 @@ export class EclairManagerPanel {
       .with({ command: "run-command" }, async ({ config: cfg }) => {
         await this.saveScaConfig(cfg);
 
-        // Determine application directory
-        const folderUri = this.resolveApplicationFolderUri();
-        const appDir = folderUri?.fsPath;
-
-        if (!appDir) {
-          vscode.window.showErrorMessage("Unable to determine application directory for west build.");
-          return;
-        }
-
-        // Determine folder URI for configuration
-        const config = vscode.workspace.getConfiguration(undefined, folderUri);
-        const configs = config.get<any[]>("zephyr-workbench.build.configurations") ?? [];
-        const activeIdx = configs.findIndex(c => c?.active === true || c?.active === "true");
-        const idx = activeIdx >= 0 ? activeIdx : 0;
-
-        // Resolve BOARD from configuration (configurations[].board > zephyr-workbench.board > env)
-        const board =
-          (configs?.[idx]?.board?.toString()?.trim() || "") ||
-          (config.get<string>("zephyr-workbench.board")?.trim() || "") ||
-          (process.env.BOARD?.trim() || "");
-
-        if (!board) {
-          vscode.window.showErrorMessage(
-            "BOARD not set. Please set it before running ECLAIR analysis."
-          );
-          return;
-        }
-
-        const buildDir = this.getBuildDir(configs, idx, appDir);
-        // TODO: deepResolvePaths is a blunt recursive replacement — replace with targeted field handling.
-        const cmakeArgs = build_cmake_args(this.deepResolvePaths(cfg));
-
-        const cmd = [
-          "west",
-          "build",
-          "--pristine",
-          `-s "${appDir}"`,
-          `-d "${buildDir}"`,
-          `--board=${board}`,
-          "--",
-          cmakeArgs
-        ].filter(Boolean).join(" ");
-
-        /*
-
-        // Run from west workspace 
-        const westTopdir = this.getWestWorkspacePath();
-        
-        if (!westTopdir) {
-          vscode.window.showErrorMessage("West workspace not found.");
-          return;
-        }
-
-        // Determine extra paths for environment
-        const extraPaths: string[] = [];
-        const sdk = process.env.ZEPHYR_SDK_INSTALL_DIR;
-        if (sdk) {
-          extraPaths.push(path.join(sdk, "arm-zephyr-eabi", "bin"));
-          extraPaths.push(path.join(sdk, "cmake", "bin"));
-          extraPaths.push(path.join(sdk, "ninja"));
-        }
-        const westFromInstaller = path.join(
-          process.env.USERPROFILE ?? "",
-          ".zinstaller",
-          ".venv",
-          "Scripts"
-        );
-        if (existsSync(westFromInstaller)) {
-          extraPaths.push(westFromInstaller);
-        }
-        // Add ECLAIR dir
-        const eclairDir = await this.detectEclairDir();
-        if (eclairDir && existsSync(eclairDir)) {
-          extraPaths.push(eclairDir);
-        }
-
-        // Ensure all env values are strings (not undefined)
-        const mergedEnv: { [key: string]: string } = {};
-        for (const [k, v] of Object.entries(process.env)) {
-          if (typeof v === "string") mergedEnv[k] = v;
-          else mergedEnv[k] = "";
-        }
-
-        // Disable ccache for SCA/ECLAIR (breaks wrapper script)
-        mergedEnv.CCACHE_DISABLE = "1";
-        mergedEnv.PATH =
-          (extraPaths.length ? extraPaths.join(path.delimiter) + path.delimiter : "") +
-          (process.env.PATH || "");
-
-        // Inject Zephyr SDK and essential variables into the environment
-        // Detect SDK (can be hardcoded for your test case)
-        let zephyrSdk = this.detectZephyrSdkDir();
-        // If not found, try buildDir (in case SDK is in the project)
-        if (!zephyrSdk && buildDir) {
-          const guess = path.join(path.dirname(buildDir), "zephyr-sdk-0.17.4");
-          if (fs.existsSync(guess)) zephyrSdk = guess;
-        }
-        if (zephyrSdk) {
-          mergedEnv.ZEPHYR_SDK_INSTALL_DIR = zephyrSdk;
-          mergedEnv.ZEPHYR_TOOLCHAIN_VARIANT = "zephyr";
-          mergedEnv.CMAKE_PREFIX_PATH = [
-            zephyrSdk,
-            path.join(zephyrSdk, "cmake"),
-            process.env.CMAKE_PREFIX_PATH
-          ].filter(Boolean).join(path.delimiter);
-          mergedEnv.PATH = [
-            path.join(zephyrSdk, "arm-zephyr-eabi", "bin"),
-            path.join(zephyrSdk, "cmake", "bin"),
-            mergedEnv.PATH
-          ].join(path.delimiter);
-        }
-
-        const out = getOutputChannel();
-        out.appendLine(`[ECLAIR cwd: ${westTopdir}`);
-        out.appendLine(`[ECLAIR cmd: ${cmd}`);
-        out.appendLine(`[ECLAIR ZEPHYR_SDK_INSTALL_DIR=${mergedEnv.ZEPHYR_SDK_INSTALL_DIR}`);
-        out.appendLine(`[ECLAIR ZEPHYR_TOOLCHAIN_VARIANT=${mergedEnv.ZEPHYR_TOOLCHAIN_VARIANT}`);
-        out.appendLine(`[ECLAIR CMAKE_PREFIX_PATH=${mergedEnv.CMAKE_PREFIX_PATH}`);
-
         try {
-          await execShellCommandWithEnv("ECLAIR Analysis", cmd, {
-            cwd: westTopdir,
-            env: mergedEnv,
-          });
-        } catch (err: any) {
-          vscode.window.showErrorMessage(`Failed to run ECLAIR: ${err}`);
-        }*/
+          const {
+            app_dir,
+            board,
+            build_dir,
+            west_top_dir,
+          } = this._prepare_for_analysis();
+
+          const merged_env = await this._get_analysis_env(west_top_dir);
+
+          let cmd = await match(cfg.config)
+            .with({ type: "preset" }, async (c) => {
+              const {
+                user_ruleset_name: fake_ruleset_name,
+                user_ruleset_path: fake_ruleset_path,
+              } = create_fake_user_ruleset();
+
+              let eclair_options = unwrap_or_throw(await handle_sources(
+                [c.ruleset, ...c.variants, ...c.tailorings],
+                cfg.repos ?? {},
+                // TODO on_progress:
+                (progress) => {},
+              ));
+
+              return build_analysis_command(
+                "USER",
+                fake_ruleset_name,
+                fake_ruleset_path,
+                eclair_options,
+                cfg.extra_config,
+                cfg.reports,
+                app_dir,
+                board,
+                build_dir,
+              );
+            })
+            .with({ type: "custom-ecl" }, (c) => {
+              const {
+                user_ruleset_name: fake_ruleset_name,
+                user_ruleset_path: fake_ruleset_path,
+              } = create_fake_user_ruleset();
+
+              return build_analysis_command(
+                c.ecl_path,
+                fake_ruleset_name,
+                fake_ruleset_path,
+                [`-eval_file=${c.ecl_path.replace(/\\/g, "/")}`],
+                cfg.extra_config,
+                cfg.reports,
+                app_dir,
+                board,
+                build_dir,
+              );
+            })
+            .with({ type: "zephyr-ruleset" }, (c) => {
+              return build_analysis_command(
+                c.ruleset,
+                c.userRulesetName,
+                c.userRulesetPath,
+                [],
+                cfg.extra_config,
+                cfg.reports,
+                app_dir,
+                board,
+                build_dir,
+              );
+            })
+            .exhaustive();
+
+            const out = getOutputChannel();
+            out.appendLine(`[ECLAIR cwd: ${west_top_dir}`);
+            out.appendLine(`[ECLAIR cmd: ${cmd}`);
+            out.appendLine(`[ECLAIR ZEPHYR_SDK_INSTALL_DIR=${merged_env.ZEPHYR_SDK_INSTALL_DIR}`);
+            out.appendLine(`[ECLAIR ZEPHYR_TOOLCHAIN_VARIANT=${merged_env.ZEPHYR_TOOLCHAIN_VARIANT}`);
+            out.appendLine(`[ECLAIR CMAKE_PREFIX_PATH=${merged_env.CMAKE_PREFIX_PATH}`);
+
+            await execShellCommandWithEnv("ECLAIR Analysis", cmd, {
+              cwd: west_top_dir,
+              env: merged_env,
+            });
+        } catch (err) {
+          vscode.window.showErrorMessage(`Failed to run ECLAIR analysis: ${err instanceof Error ? err.message : String(err)}`);
+          return;
+        }
       })
       .with({ command: "probe-eclair" }, () => this.runEclair())
       .with({ command: "browse-user-ruleset-path" }, async () => {
@@ -1153,6 +1111,111 @@ export class EclairManagerPanel {
 
     return repos;
   }
+
+  _prepare_for_analysis() {
+    // Determine application directory
+    const folderUri = this.resolveApplicationFolderUri();
+    const app_dir = folderUri?.fsPath;
+
+    if (!app_dir) {
+      throw new Error("Unable to determine application directory for west build.");
+    }
+
+    // Determine folder URI for configuration
+    const config = vscode.workspace.getConfiguration(undefined, folderUri);
+    const configs = config.get<any[]>("zephyr-workbench.build.configurations") ?? [];
+    const active_idx = configs.findIndex(c => c?.active === true || c?.active === "true");
+    const idx = active_idx >= 0 ? active_idx : 0;
+
+    // Resolve BOARD from configuration (configurations[].board > zephyr-workbench.board > env)
+    const board =
+      (configs?.[idx]?.board?.toString()?.trim() || "") ||
+      (config.get<string>("zephyr-workbench.board")?.trim() || "") ||
+      (process.env.BOARD?.trim() || "");
+
+    if (!board) {
+      throw new Error("BOARD not set. Please set it before running ECLAIR analysis.");
+    }
+
+    const build_dir = this.getBuildDir(configs, idx, app_dir);
+
+    const west_top_dir = this.getWestWorkspacePath();
+    if (!west_top_dir) {
+      throw new Error("West workspace not found.");
+    }
+
+    return {
+      app_dir,
+      board,
+      build_dir,
+      west_top_dir
+    };
+  }
+
+  async _get_analysis_env(
+    build_dir: string,
+  ): Promise<Record<string, string>> {
+    // Determine extra paths for environment
+    const extra_paths: string[] = [];
+    const sdk = process.env.ZEPHYR_SDK_INSTALL_DIR;
+    if (sdk) {
+      extra_paths.push(path.join(sdk, "arm-zephyr-eabi", "bin"));
+      extra_paths.push(path.join(sdk, "cmake", "bin"));
+      extra_paths.push(path.join(sdk, "ninja"));
+    }
+    const westFromInstaller = path.join(
+      process.env.USERPROFILE ?? "",
+      ".zinstaller",
+      ".venv",
+      "Scripts"
+    );
+    if (existsSync(westFromInstaller)) {
+      extra_paths.push(westFromInstaller);
+    }
+    // Add ECLAIR dir
+    const eclairDir = await this.detectEclairDir();
+    if (eclairDir && existsSync(eclairDir)) {
+      extra_paths.push(eclairDir);
+    }
+
+    // Ensure all env values are strings (not undefined)
+    const merged_env: { [key: string]: string } = {};
+    for (const [k, v] of Object.entries(process.env)) {
+      if (typeof v === "string") merged_env[k] = v;
+      else merged_env[k] = "";
+    }
+
+    // Disable ccache for SCA/ECLAIR (breaks wrapper script)
+    merged_env.CCACHE_DISABLE = "1";
+    merged_env.PATH =
+      (extra_paths.length ? extra_paths.join(path.delimiter) + path.delimiter : "") +
+      (process.env.PATH || "");
+
+    // Inject Zephyr SDK and essential variables into the environment
+    // Detect SDK (can be hardcoded for your test case)
+    let zephyr_sdk_dir = this.detectZephyrSdkDir();
+    // If not found, try buildDir (in case SDK is in the project)
+    if (!zephyr_sdk_dir && build_dir) {
+      const guess = path.join(path.dirname(build_dir), "zephyr-sdk-0.17.4");
+      if (fs.existsSync(guess)) zephyr_sdk_dir = guess;
+    }
+    if (zephyr_sdk_dir) {
+      merged_env.ZEPHYR_SDK_INSTALL_DIR = zephyr_sdk_dir;
+      merged_env.ZEPHYR_TOOLCHAIN_VARIANT = "zephyr";
+      merged_env.CMAKE_PREFIX_PATH = [
+        zephyr_sdk_dir,
+        path.join(zephyr_sdk_dir, "cmake"),
+        process.env.CMAKE_PREFIX_PATH
+      ].filter(Boolean).join(path.delimiter);
+      merged_env.PATH = [
+        path.join(zephyr_sdk_dir, "arm-zephyr-eabi", "bin"),
+        path.join(zephyr_sdk_dir, "cmake", "bin"),
+        merged_env.PATH
+      ].join(path.delimiter);
+    }
+
+    return merged_env;
+  }
 }
 
 /**
@@ -1252,3 +1315,189 @@ async function scanAllRepoPresets(
   post_message({ command: "repo-scan-done", name });
 }
 
+function build_analysis_command(
+    ruleset: string,
+    user_ruleset_name: string | undefined,
+    user_ruleset_path: string | undefined,
+    eclair_options: string[],
+    extra_config: string | undefined,
+    reports: string[] | undefined,
+    app_dir: string,
+    build_dir: string,
+    board: string,
+  ): string {
+
+    const cmake_args: string[] = [
+      "-DZEPHYR_SCA_VARIANT=eclair",
+      ...cmake_compiler_launcher_options(),
+      ...cmake_ruleset_selection_options(ruleset, user_ruleset_name, user_ruleset_path),
+      ...(extra_config ? cmake_extra_config_options(eclair_options, extra_config.trim()) : []),
+      ...cmake_reports_options(reports),
+    ];
+
+    const west = get_west_cmd();
+
+    return [
+      west,
+      "build",
+      "--pristine",
+      `-s "${app_dir}"`,
+      `-d "${build_dir}"`,
+      `--board=${board}`,
+      "--",
+      ...cmake_args
+    ].filter(Boolean).join(" ");
+  }
+
+function cmake_compiler_launcher_options() {
+  if (process.platform === "win32") {
+    // Windows needs empty values to unset the launchers
+    return [
+      "-DCMAKE_C_COMPILER_LAUNCHER=",
+      "-DCMAKE_CXX_COMPILER_LAUNCHER="
+    ];
+  } else {
+    // Linux and macOS can use -U to unset the launchers
+    return [
+      "-UCMAKE_C_COMPILER_LAUNCHER",
+      "-UCMAKE_CXX_COMPILER_LAUNCHER"
+    ];
+  }
+}
+
+function cmake_ruleset_selection_options(
+  ruleset: string,
+  user_ruleset_name: string | undefined,
+  user_ruleset_path: string | undefined,
+) {
+  let cmake_args: string[] = [];
+
+  if (ruleset === "USER") {
+    cmake_args.push("-DECLAIR_RULESET_USER=ON");
+    const name = (user_ruleset_name || "").trim();
+    const p = (user_ruleset_path || "").trim();
+    if (name) cmake_args.push(`-DECLAIR_USER_RULESET_NAME=\"${name}\"`);
+    if (p) cmake_args.push(`-DECLAIR_USER_RULESET_PATH=\"${p}\"`);
+    cmake_args.push("-DECLAIR_RULESET_FIRST_ANALYSIS=OFF");
+  } else if (ruleset) {
+    cmake_args.push(`-D${ruleset}=ON`);
+    if (ruleset !== "ECLAIR_RULESET_FIRST_ANALYSIS") {
+      cmake_args.push("-DECLAIR_RULESET_FIRST_ANALYSIS=OFF");
+    }
+  } else {
+    cmake_args.push("-DECLAIR_RULESET_FIRST_ANALYSIS=ON");
+  }
+
+  return cmake_args;
+}
+
+function cmake_extra_config_options(
+  eclair_options: string[],
+  extra_config: string,
+) {
+  if (
+    !extra_config ||
+    extra_config === "Checking" ||
+    extra_config === "Not Found" ||
+    !fs.existsSync(extra_config) ||
+    fs.statSync(extra_config).isDirectory()
+  ) {
+    return [];
+  }
+
+  const ext = path.extname(extra_config).toLowerCase();
+  const filePath = extra_config.replace(/\\/g, "/");
+
+  let finalPath = filePath;
+  if (ext === ".ecl" || ext === ".eclair") {
+    // .ecl file needs a wrapper that uses -eval_file
+    const wrapperPath = path.join(os.tmpdir(), "eclair_wrapper.cmake");
+
+    let content = "";
+
+    for (const opt of eclair_options) {
+      const escaped_opt = opt.replace(/"/g, '\\"');
+      content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "${escaped_opt}")\n`;
+    }
+
+    content += `list(APPEND ECLAIR_ENV_ADDITIONAL_OPTIONS "-eval_file=${filePath}")\n`;
+    fs.writeFileSync(wrapperPath, content, { encoding: "utf8" });
+    finalPath = wrapperPath.replace(/\\/g, "/");
+  }
+  return [`-DECLAIR_OPTIONS_FILE=${finalPath}`];
+}
+
+function cmake_reports_options(reports: string[] | undefined) {
+  const selected = (reports || []).includes("ALL")
+      ? ALL_ECLAIR_REPORTS
+      : (reports || []).filter(r => r !== "ALL");
+
+  return selected.map(r => `-D${r}=ON`);
+}
+
+function get_west_cmd() {
+  if (process.platform === "win32") {
+    const westFromInstaller = path.join(
+      process.env.USERPROFILE ?? "",
+      ".zinstaller",
+      ".venv",
+      "Scripts",
+      "west.exe"
+    );
+    try {
+      accessSync(westFromInstaller);
+      return `& "${westFromInstaller}"`;
+    } catch {
+      return "west";
+    }
+  }
+
+  return "west";
+}
+
+function create_fake_user_ruleset() {
+  const fake_path = path.join(os.tmpdir(), "dummy_user_ruleset");
+  const fake_name = "dummy";
+  const fake_ecl = path.join(fake_path, `analysis_${fake_name}.ecl`);
+
+  if (!fs.existsSync(fake_ecl)) {
+    fs.mkdirSync(fake_path, { recursive: true });
+    fs.writeFileSync(fake_ecl, `ruleset: ${fake_name}\n`, { encoding: "utf8" });
+  }
+
+  return {
+    user_ruleset_name: fake_name,
+    user_ruleset_path: fake_path,
+  };
+}
+
+async function handle_sources(
+  sel: PresetSelectionState[],
+  repos: EclairRepos,
+  on_progress: (message: string) => void,
+): Promise<Result<string[], string>> {
+  let all_commands: string[] = [];
+  for (const s of sel) {
+    let r = await handle_source(s, repos, on_progress);
+    if ("err" in r) {
+      return { err: `Failed to load preset: ${r.err}` };
+    }
+    all_commands = all_commands.concat(r.ok);
+  }
+  return { ok: all_commands };
+}
+
+async function handle_source(
+  sel: PresetSelectionState,
+  repos: EclairRepos,
+  on_progress: (message: string) => void,
+): Promise<Result<string[], string>> {
+  let r = await load_preset_from_ref(sel.source, repos, on_progress);
+  if ("err" in r) {
+    return { err: `Failed to load preset: ${r.err}` };
+  }
+  const [preset, path] = r.ok;
+  let eclair_commands = format_flag_settings(preset, sel.edited_flags).map(s => s.statement);
+  eclair_commands.push("-eval_file=\"" + path.replace(/\\/g, "/") + "\"");
+  return { ok: eclair_commands };
+}

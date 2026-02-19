@@ -4,11 +4,10 @@ export interface EclairTemplate {
   kind: EclairTemplateKind;
   description: string;
   authors: string[];
-  provides: Map<string, AnyDataValue>;
-  requires: Map<string, AnyDataValue>;
+  provides: Record<string, AnyDataValue>;
+  requires: Record<string, AnyDataValue>;
   deps: string[];
   options: EclairTemplateOption[];
-  content?: EclairTemplateContent;
 }
 
 export type AnyDataValue = string | number | boolean | null | AnyDataValue[] | { [key: string]: AnyDataValue };
@@ -36,53 +35,3 @@ export type EclairTemplateFlagOption = {
   default?: boolean;
 };
 
-export type EclairTemplateContent =
-  EclairTemplateStringValueContent |
-  EclairTemplateJoinedListContent |
-  EclairTemplateConditionalContent |
-  EclairTemplateForEachContent;
-
-export type EclairTemplateStringValueContent = {
-  kind: "string_value";
-  value: string;
-};
-
-export type EclairTemplateJoinedListContent = {
-  kind: "joined_list";
-  items: EclairTemplateContent[];
-};
-
-export type EclairTemplateConditionalContent = {
-  kind: "conditional";
-  condition: EclairTemplateCondition;
-  then_content?: EclairTemplateContent;
-  else_content?: EclairTemplateContent;
-};
-
-export type EclairTemplateForEachContent = {
-  kind: "for_each";
-  item: string;
-  in: "ALL_FLAGS";
-  yield: EclairTemplateContent;
-};
-
-/**
- * All the available predicates that can be used in "if" conditions.
- */
-export type EclairTemplateCondition = {
-  kind: "flag";
-  flag_id: string;
-} | {
-  kind: "any_of";
-  conditions: EclairTemplateCondition[];
-} | {
-  kind: "all_of";
-  conditions: EclairTemplateCondition[];
-} | {
-  kind: "not";
-  condition: EclairTemplateCondition;
-} | {
-  kind: "starts_with";
-  str: string;
-  prefix: string;
-};
