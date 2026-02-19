@@ -13,8 +13,12 @@ export function ReportViewerSection(props: {
       <div className="grid-group-div command-actions">
         <VscodeButton
           appearance="primary"
-          disabled={props.reportServer.running}
-          onClick={() => props.post_message({ command: "start-report-server" })}
+          onClick={() => {
+            if (props.reportServer.running) {
+              props.post_message({ command: "stop-report-server" });
+            }
+            props.post_message({ command: "start-report-server" });
+          }}
         >
           <span className="codicon codicon-preview"></span> Open Report Viewer
         </VscodeButton>
