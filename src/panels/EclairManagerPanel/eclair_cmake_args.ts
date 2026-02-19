@@ -1,5 +1,5 @@
 import path from "path";
-import { ALL_ECLAIR_REPORTS, EclairScaConfig, EclairScaCustomEclConfig, EclairScaMainConfig, EclairScaPresetConfig, EclairScaZephyrRulesetConfig } from "../../utils/eclair/config";
+import { ALL_ECLAIR_REPORTS, EclairPresetTemplateSource, EclairRepos, EclairScaConfig, EclairScaCustomEclConfig, EclairScaMainConfig, EclairScaPresetConfig, EclairScaZephyrRulesetConfig, PresetSelectionState } from "../../utils/eclair/config";
 import { accessSync } from "fs";
 import fs from "fs";
 import os from "os";
@@ -7,6 +7,8 @@ import { match } from "ts-pattern";
 import { EclairTemplate } from "../../utils/eclair/template";
 import { format_flag_settings } from "../../utils/eclair/template_utils";
 import { SinglePresetSelectionState } from "../../webview/eclairmanager/state";
+import { load_preset_from_ref } from "./templates";
+import { Result, unwrap_or_throw_async } from "../../utils/typing_utils";
 
 export function build_cmake_args(cfg: EclairScaConfig): string[] {
   const parts: string[] = [];
@@ -45,7 +47,7 @@ export function build_cmake_args(cfg: EclairScaConfig): string[] {
   }
 
   const additional_eclair_options = match(cfg.config)
-    .with({ type: "preset" }, c => handle_preset_config(parts, c))
+    .with({ type: "preset" }, c => unwrap_or_throw_async(handle_preset_config(parts, c, cfg.repos ?? {}, (message) => {})))
     .with({ type: "custom-ecl" }, c => handle_custom_ecl_config(parts, c))
     .with({ type: "zephyr-ruleset" }, c => handle_zephyr_ruleset_config(parts, c))
     .exhaustive();
@@ -94,14 +96,52 @@ export function build_cmake_args(cfg: EclairScaConfig): string[] {
   return parts;
 }
 
-function handle_preset_config(parts: string[], cfg: EclairScaPresetConfig): string[] {
-  // TODO
-  return [];
+async function handle_preset_config(
+  parts: string[],
+  cfg: EclairScaPresetConfig,
+  repos: EclairRepos,
+  on_progress: (message: string) => void,
+): Promise<Result<string[], string>> {
+  return await handle_sources(
+    [cfg.ruleset, ...cfg.variants, ...cfg.tailorings],
+    repos,
+    on_progress,
+  );
 }
 
 function handle_custom_ecl_config(parts: string[], cfg: EclairScaCustomEclConfig): string[] {
-  // TODO
-  return [];
+  return [`eval_file=${cfg.ecl_path.replace(/\\/g, "/")}`];
+}
+
+async function handle_sources(
+  sel: PresetSelectionState[],
+  repos: EclairRepos,
+  on_progress: (message: string) => void,
+): Promise<Result<string[], string>> {
+  let all_commands: string[] = [];
+  for (const s of sel) {
+    let r = await handle_source(s, repos, on_progress);
+    if ("err" in r) {
+      return { err: `Failed to load preset: ${r.err}` };
+    }
+    all_commands = all_commands.concat(r.ok);
+  }
+  return { ok: all_commands };
+}
+
+async function handle_source(
+  sel: PresetSelectionState,
+  repos: EclairRepos,
+  on_progress: (message: string) => void,
+): Promise<Result<string[], string>> {
+  let r = await load_preset_from_ref(sel.source, repos, on_progress);
+  if ("err" in r) {
+    return { err: `Failed to load preset: ${r.err}` };
+  }
+  const [preset, path] = r.ok;
+  let eclair_commands = format_flag_settings(preset, sel.edited_flags);
+  eclair_commands.push("-eval_file=\"" + path.replace(/\\/g, "/") + "\"");
+  return { ok: eclair_commands };
 }
 
 function handle_zephyr_ruleset_config(parts: string[], cfg: EclairScaZephyrRulesetConfig): string[] {

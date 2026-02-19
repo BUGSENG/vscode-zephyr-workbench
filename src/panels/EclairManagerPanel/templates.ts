@@ -66,7 +66,7 @@ export async function load_preset_from_repo(
   ref: string,
   filePath: string,
   on_progress: (message: string) => void,
-): Promise<Result<EclairTemplate, string>> {
+): Promise<Result<[EclairTemplate, string], string>> {
   on_progress("Cloning repository...");
 
   let checkoutDir: string;
@@ -78,22 +78,33 @@ export async function load_preset_from_repo(
 
   const absolutePath = path.join(checkoutDir, filePath);
 
-  return await load_preset_from_path(absolutePath, on_progress);
+  const r = await load_preset_from_path(absolutePath, on_progress);
+  if ("err" in r) {
+    return { err: `Failed to load preset from repository: ${r.err}` };
+  }
+
+  return { ok: [r.ok, absolutePath] };
 }
 
 export async function load_preset_from_ref(
   source: EclairPresetTemplateSource,
   repos: EclairRepos,
   on_progress: (message: string) => void,
-): Promise<Result<EclairTemplate, string>> {
-  return match(source)
-    .with({ type: "system-path" }, ({ path }) => load_preset_from_path(path, on_progress))
-    .with({ type: "repo-path" }, ({ repo, path }) => {
+): Promise<Result<[EclairTemplate, string], string>> {
+  return await match(source)
+    .with({ type: "system-path" }, async ({ path }) => {
+      const r = await load_preset_from_path(path, on_progress);
+      if ("err" in r) {
+        return { err: `Failed to load preset from path: ${r.err}` };
+      }
+      return { ok: [r.ok, path] as [EclairTemplate, string] };
+    })
+    .with({ type: "repo-path" }, async ({ repo, path }) => {
       const entry = repos[repo];
       if (!entry) {
         return { err: `Repository '${repo}' not found in repos configuration.` };
       }
-      return load_preset_from_repo(repo, entry.origin, entry.ref, path, on_progress);
+      return await load_preset_from_repo(repo, entry.origin, entry.ref, path, on_progress);
     })
     .exhaustive();
 }

@@ -316,7 +316,7 @@ type ResolvedFlags = {
 
 function resolve_flags(
   template: EclairTemplate,
-  selected_options: Map<string, boolean>,
+  selected_options: Record<string, boolean>,
 ): ResolvedFlags {
   const flags = new Map<string, boolean>();
   const flag_order: string[] = [];
@@ -334,7 +334,8 @@ function resolve_flags(
 
   collect_flags(template.options);
 
-  for (const [flag_id, enabled] of selected_options) {
+  for (const flag_id in selected_options) {
+    const enabled = selected_options[flag_id];
     if (!flags.has(flag_id)) {
       throw new Error(`Unknown flag: ${flag_id}`);
     }
@@ -346,7 +347,7 @@ function resolve_flags(
 
 export function format_flag_settings(
   template: EclairTemplate,
-  selected_options: Map<string, boolean>,
+  selected_options: Record<string, boolean>,
 ): string[] {
   const { flags, flag_order } = resolve_flags(template, selected_options);
   return flag_order.map((flag_id) => `set(${flag_id},${flags.get(flag_id) ? "1" : "nil"})`);
@@ -354,7 +355,7 @@ export function format_flag_settings(
 
 export function instantiate(
   template: EclairTemplate,
-  selected_options: Map<string, boolean>,
+  selected_options: Record<string, boolean>,
 ): string {
   const { flags, flag_order } = resolve_flags(template, selected_options);
 
