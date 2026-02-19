@@ -25,7 +25,7 @@ export function PresetSelection(props: {
           Repositories are checked out on demand and scanned for preset templates.
         </p>
         <p>
-          A reference repository with curated preset is available at {BUGSENG_REPO_LINK}.
+          A reference repository with some curated presets is available at {BUGSENG_REPO_LINK}.
         </p>
       </RichHelpTooltip>
     </h3>

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { EclairRepos } from "../../../../../utils/eclair/config";
 import { AvailablePresetsState, EclairStateAction, RepoScanState } from "../../../state";
 import { WebviewMessage } from "../../../../../utils/eclairEvent";
-import { StatusBadge, StatusBadgeState, VscodeButton, VscodePanel, VscodeTextField } from "../../vscode";
+import { StatusBadge, StatusBadgeState, VscodeBadge, VscodeButton, VscodePanel, VscodeTextField } from "../../vscode";
 
 const EMPTY_REPO_FORM = { name: "", origin: "", rev: "" };
 
@@ -276,7 +276,7 @@ function repo_scan_state_to_badge_status(scanState: RepoScanState | undefined, t
       const skipped = totalFiles - n;
       return {
         kind: "success",
-        label: `${n} template${n === 1 ? "" : "s"}`,
+        label: <VscodeBadge>{n}</VscodeBadge>,
         detail: skipped > 0 ? `(${skipped} skipped)` : undefined,
       };
     }

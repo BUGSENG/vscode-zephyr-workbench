@@ -118,10 +118,10 @@ export function VscodeAlert(props: {
 }
 
 export type StatusBadgeState =
-  | { kind: "idle"; label?: string }
-  | { kind: "loading"; label?: string }
-  | { kind: "success"; label: string; detail?: string }
-  | { kind: "error"; label?: string; message: string };
+  | { kind: "idle"; label?: string | React.ReactNode }
+  | { kind: "loading"; label?: string | React.ReactNode }
+  | { kind: "success"; label: string | React.ReactNode; detail?: string | React.ReactNode }
+  | { kind: "error"; label?: string | React.ReactNode; message: string | React.ReactNode };
 
 export function StatusBadge({ status }: { status: StatusBadgeState }) {
   switch (status.kind) {

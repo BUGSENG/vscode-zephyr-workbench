@@ -3,10 +3,11 @@ import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig, PresetSelecti
 import { EclairTemplate, EclairTemplateKind } from "../../utils/eclair/template";
 import { match } from "ts-pattern";
 import { produce, WritableDraft } from "immer";
+import { Monospace } from "./components/vscode";
 
 const DEFAULT_INSTALL_PATH_PLACEHOLDER = "Enter the tool's path if not in the global PATH";
 const BUGSENG_REPO_URL = "https://github.com/BUGSENG/zephyr-workbench-eclair-presets";
-export const BUGSENG_REPO_LINK = <a href={BUGSENG_REPO_URL}><code>BUGSENG/zephyr-workbench-eclair-presets</code></a>;
+export const BUGSENG_REPO_LINK = <a href={BUGSENG_REPO_URL}><Monospace>BUGSENG/zephyr-workbench-eclair-presets</Monospace></a>;
 
 export interface EclairState {
   status: StatusState;
