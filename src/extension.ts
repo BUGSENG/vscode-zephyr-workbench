@@ -1231,7 +1231,7 @@ export function activate(context: vscode.ExtensionContext) {
 				if (node.config) {
 					const project = node.project;
 					const config = node.config;
-					let value = await changeEnvVarQuickStep(config, node.envKey, node.envValue);
+					let value = await changeEnvVarQuickStep(project, node.envKey, node.envValue);
 					if (value) {
 						replaceEnvValue(config.envVars, node.envKey, node.envValue, value);
 						let workspaceFolder = getWorkspaceFolder(project.folderPath);
@@ -2297,6 +2297,8 @@ export async function executeConfigTask(taskName: string, node: any, configName?
 	}
 
 	return new Promise<vscode.TaskExecution[] | undefined>(async resolve => {
+		// These specific commands below are executed directly, they are not saved in tasks.json
+		const tasks = ['DT Doctor', 'West ROM Report', 'West RAM Report', 'Gui Config', 'Menu Config', 'Harden Config'];
 		// Execute task
 		if (listTasks.length > 0) {
 			try {
@@ -2310,8 +2312,14 @@ export async function executeConfigTask(taskName: string, node: any, configName?
 				resolve(undefined);
 			}
 		} else {
-			vscode.window.showErrorMessage(`Cannot find "${taskName}" task.`);
-			resolve(undefined);
+			if (tasks) {
+				resolve(undefined);
+			}
+			else{
+				vscode.window.showErrorMessage(`Cannot find "${taskName}" task.`);
+				resolve(undefined);
+			}
+			
 		}
 	});
 }
