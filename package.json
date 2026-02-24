@@ -1670,6 +1670,7 @@
     ]
   },
   "scripts": {
+    "dist": "vsce package",
     "vscode:prepublish": "npm run package",
     "compile": "tsc --noEmit && node ./esbuild.js",
     "package": "tsc --noEmit && cross-env NODE_ENV=production node ./esbuild.js",
