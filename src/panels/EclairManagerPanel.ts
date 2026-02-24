@@ -10,7 +10,7 @@ import { getInternalDirRealPath, getZephyrSDK } from "../utils/utils";
 import { getExtraPaths, normalizePath, setExtraPath } from "../utils/envYamlUtils";
 import type { IEclairExtension } from "../ext/eclair_api";
 import type { ExtensionMessage, WebviewMessage } from "../utils/eclairEvent";
-import { extract_yaml_from_ecl_content, format_flag_settings, parse_eclair_template_from_any } from "../utils/eclair/template_utils";
+import { extract_yaml_from_ecl_content, format_option_settings, parse_eclair_template_from_any } from "../utils/eclair/template_utils";
 import { ALL_ECLAIR_REPORTS, EclairPresetTemplateSource, EclairRepos, EclairScaConfig, EclairScaZephyrRulesetConfig, PresetSelectionState } from "../utils/eclair/config";
 import { ensureRepoCheckout, deleteRepoCheckout } from "./EclairManagerPanel/repo_manage";
 import { Result, unwrap_or_throw } from "../utils/typing_utils";
@@ -1500,7 +1500,7 @@ async function handle_source(
     return { err: `Failed to load preset: ${r.err}` };
   }
   const [preset, path] = r.ok;
-  let eclair_commands = format_flag_settings(preset, sel.edited_flags).map(s => s.statement);
+  let eclair_commands = format_option_settings(preset, sel.edited_flags).map(s => s.statement);
   eclair_commands.push("-eval_file=\"" + path.replace(/\\/g, "/") + "\"");
   return { ok: eclair_commands };
 }

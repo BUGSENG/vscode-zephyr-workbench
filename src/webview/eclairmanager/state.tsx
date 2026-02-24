@@ -210,8 +210,8 @@ export type EclairStateAction =
   | { type: "set-custom-ecl-path"; path: string }
   | { type: "report-server-started" }
   | { type: "report-server-stopped" }
-  | { type: "set-preset-flag"; source: EclairPresetTemplateSource; flagId: string; value: boolean }
-  | { type: "clear-preset-flag"; source: EclairPresetTemplateSource; flagId: string }
+  | { type: "set-preset-option"; source: EclairPresetTemplateSource; option_id: string; value: boolean | string }
+  | { type: "clear-preset-option"; source: EclairPresetTemplateSource; option_id: string }
   | { type: "remove-selected-preset"; kind: EclairTemplateKind; index: number }
   | { type: "preset-content"; source: EclairPresetTemplateSource; template: EclairTemplate | { loading: string } | { error: string } }
   | { type: "set-preset-path"; kind: EclairTemplateKind; path: string }
@@ -412,25 +412,25 @@ export function eclairReducer(state: EclairState, action: EclairStateAction): Ec
     .with({ type: "report-server-stopped" }, () => {
       draft.report_server.running = false;
     })
-    .with({ type: "set-preset-flag" }, ({ source, flagId, value }) => {
+    .with({ type: "set-preset-option" }, ({ source, option_id, value }) => {
       if (draft.analysis_configuration.type !== "preset") return;
       const sourceId = preset_template_source_id(source);
       const updatePreset = (preset: WritableDraft<PresetSelectionState>) => {
         if (preset_template_source_id(preset.source) !== sourceId) return;
         if (!preset.edited_flags) preset.edited_flags = {};
-        preset.edited_flags[flagId] = value;
+        preset.edited_flags[option_id] = value;
       };
       const s = draft.analysis_configuration.state;
       if (s.ruleset_state.preset) updatePreset(s.ruleset_state.preset);
       s.variants_state.presets.forEach(updatePreset);
       s.tailorings_state.presets.forEach(updatePreset);
     })
-    .with({ type: "clear-preset-flag" }, ({ source, flagId }) => {
+    .with({ type: "clear-preset-option" }, ({ source, option_id }) => {
       if (draft.analysis_configuration.type !== "preset") return;
       const sourceId = preset_template_source_id(source);
       const updatePreset = (preset: WritableDraft<PresetSelectionState>) => {
         if (preset_template_source_id(preset.source) !== sourceId) return;
-        if (preset.edited_flags) delete preset.edited_flags[flagId];
+        if (preset.edited_flags) delete preset.edited_flags[option_id];
       };
       const s = draft.analysis_configuration.state;
       if (s.ruleset_state.preset) updatePreset(s.ruleset_state.preset);

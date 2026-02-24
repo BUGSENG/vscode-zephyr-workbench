@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
 import { AvailablePresetsState, BUGSENG_REPO_LINK, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetsSelectionState, RepoScanState, SinglePresetSelectionState } from "../../state";
-import { PickPath, SearchableDropdown, SearchableItem, StatusBadge, StatusBadgeState, VscodeAlert, VscodeBadge, VscodeButton, VscodeCheckbox, VscodePanel, SimpleHelpTooltip, RichHelpTooltip, VscodeTextField, Monospace } from "../vscode";
+import { PickPath, SearchableDropdown, SearchableItem, StatusBadge, StatusBadgeState, VscodeAlert, VscodeBadge, VscodeButton, VscodeCheckbox, VscodePanel, SimpleHelpTooltip, RichHelpTooltip, VscodeTextField, Monospace, VscodeDropdown, VscodeOption } from "../vscode";
 import { EclairTemplate, EclairTemplateKind, EclairTemplateOption } from "../../../../utils/eclair/template";
 import { EclairPresetTemplateSource, EclairRepos, PresetSelectionState } from "../../../../utils/eclair/config";
 import { RepoManagementSection } from "./preset_selection/repo_management";
+import { match } from "ts-pattern";
 
 export function PresetSelection(props: {
   state: PresetsSelectionState;
@@ -361,16 +362,16 @@ function PresetSettings({
               option={option}
               level={0}
               editedFlags={preset.edited_flags ?? {}}
-              onSetFlag={(flagId, value) => dispatch_state({
-                type: "set-preset-flag",
+              onSetFlag={(option_id, value) => dispatch_state({
+                type: "set-preset-option",
                 source: preset.source,
-                flagId,
+                option_id,
                 value,
               })}
-              onClearFlag={(flagId) => dispatch_state({
-                type: "clear-preset-flag",
+              onClearFlag={(option_id) => dispatch_state({
+                type: "clear-preset-option",
                 source: preset.source,
-                flagId,
+                option_id,
               })}
             />
           ))}
@@ -398,14 +399,14 @@ function TemplateOptionTree({
 }: {
   option: EclairTemplateOption;
   level?: number;
-  editedFlags: Record<string, boolean>;
-  onSetFlag: (flagId: string, value: boolean) => void;
-  onClearFlag: (flagId: string) => void;
+  editedFlags: Record<string, boolean | string>;
+  onSetFlag: (option_id: string, value: boolean | string) => void;
+  onClearFlag: (option_id: string) => void;
 }) {
   const [expanded, setExpanded] = useState<boolean>(true);
 
   const indentStyle: React.CSSProperties = {
-    marginLeft: `${level * 20}px`,
+    marginLeft: `${level * 10}px`,
     marginTop: "4px",
     marginBottom: "4px",
   };
@@ -414,10 +415,27 @@ function TemplateOptionTree({
     *
   </span>);
 
-  switch (option.variant.kind) {
-    case "flag": {
-      const defaultValue = option.variant.default ?? false;
-      const editedValue = editedFlags[option.id];
+  const OptionTitle = ({ modified }: { modified: boolean }) => {
+    if (option.title && option.title !== option.id) {
+      return (<>
+        <span style={{ marginRight: "8px", color: "var(--vscode-descriptionForeground)", fontSize: "0.9em" }}>
+          ({option.id})
+        </span>
+        {modified && modified_star}
+        <span>{option.title}</span>
+      </>);
+    } else {
+      return (<>
+        <span>{option.id}</span>
+        {modified && modified_star}
+      </>);
+    }
+  };
+
+  return match(option.variant)
+    .with({ kind: "flag" }, (variant) => {
+      const defaultValue = variant.default ?? false;
+      const editedValue: boolean | undefined = typeof(editedFlags[option.id]) === "boolean" ? editedFlags[option.id] as boolean : undefined;
       const isEdited = editedValue !== undefined;
       const checked = isEdited ? editedValue : defaultValue;
 
@@ -428,17 +446,7 @@ function TemplateOptionTree({
               checked={checked}
               onChange={(e: any) => onSetFlag(option.id, !!e.target.checked)}
             >
-              <span style={{
-                fontFamily: "var(--vscode-editor-font-family)",
-              }}>
-                {option.id}
-              </span>
-              {isEdited && modified_star}
-              {option.title && option.title !== option.id && (
-                <span style={{ marginLeft: "8px", color: "var(--vscode-descriptionForeground)", fontSize: "0.9em" }}>
-                  ({option.title})
-                </span>
-              )}
+              <OptionTitle modified={isEdited} />
             </VscodeCheckbox>
             {isEdited && (
               <span
@@ -456,9 +464,9 @@ function TemplateOptionTree({
           </div>
         </div>
       );
-    }
-    case "group": {
-      const allFlagIds = option.variant.children.flatMap(collectFlagIds);
+    })
+    .with({ kind: "group" }, (variant) => {
+      const allFlagIds = variant.children.flatMap(collectFlagIds);
       const any_modified = allFlagIds.some((id) => editedFlags[id] !== undefined);
 
       return (
@@ -476,13 +484,7 @@ function TemplateOptionTree({
             <span style={{ marginRight: "6px", fontSize: "0.8em" }}>
               {expanded ? "▼" : "▶"}
             </span>
-            <span>{option.title || option.id}</span>
-            {option.title && option.title !== option.id && (
-              <span style={{ marginLeft: "8px", color: "var(--vscode-descriptionForeground)", fontSize: "0.9em" }}>
-                ({option.id})
-              </span>
-            )}
-            {any_modified && modified_star}
+            <OptionTitle modified={any_modified} />
             <VscodeBadge style={{ marginLeft: "8px" }}>{allFlagIds.length}</VscodeBadge>
             <div
               style={{ marginLeft: "12px", display: "flex", gap: "4px" }}
@@ -506,22 +508,41 @@ function TemplateOptionTree({
               ><span className="codicon codicon-discard" /></VscodeButton>
             </div>
           </div>
-          {expanded && (
-            <div>
-              {option.variant.children.map((childOption, idx) => (
-                <TemplateOptionTree
-                  key={childOption.id || idx}
-                  option={childOption}
-                  level={level + 1}
-                  editedFlags={editedFlags}
-                  onSetFlag={onSetFlag}
-                  onClearFlag={onClearFlag}
-                />
-              ))}
-            </div>
-          )}
+          {expanded && variant.children.map((childOption, idx) => (
+            <TemplateOptionTree
+              key={childOption.id || idx}
+              option={childOption}
+              level={level + 1}
+              editedFlags={editedFlags}
+              onSetFlag={onSetFlag}
+              onClearFlag={onClearFlag}
+            />
+          ))}
         </div>
       );
-    }
-  }
+    })
+    .with({ kind: "select" }, (variant) => {
+      const default_value = variant.default;
+      const edited_value: string | undefined = typeof(editedFlags[option.id]) === "string" ? editedFlags[option.id] as string : undefined;
+      const is_edited = edited_value !== undefined;
+      const value = is_edited ? edited_value : default_value;
+
+      return (
+        <div style={indentStyle}>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <label htmlFor={`option-select-${option.id}`}><OptionTitle modified={is_edited} /></label>
+            <VscodeDropdown
+              id={`option-select-${option.id}`}
+              onChange={(e: any) => onSetFlag(option.id, e.target.value)} value={value}
+              style={{ width: "100px" }}
+            >
+              {variant.values.map((v) => (<VscodeOption key={v.value} value={v.value} selected={v.value === value}>
+                {v.value} - {v.description}
+              </VscodeOption>))}
+            </VscodeDropdown>
+          </div>
+        </div>
+      );
+    })
+    .exhaustive();
 }

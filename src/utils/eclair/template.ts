@@ -23,7 +23,8 @@ export type EclairTemplateOption = {
 
 export type EclairTemplateOptionVariant =
   EclairTemplateGroupOption |
-  EclairTemplateFlagOption;
+  EclairTemplateFlagOption |
+  EclairTemplateSelectOption;
 
 export type EclairTemplateGroupOption = {
   kind: "group";
@@ -33,5 +34,16 @@ export type EclairTemplateGroupOption = {
 export type EclairTemplateFlagOption = {
   kind: "flag";
   default?: boolean;
+};
+
+export type EclairTemplateSelectOption = {
+  kind: "select";
+  values: EclairTemplateSelectValue[];
+  default: string;
+};
+
+export type EclairTemplateSelectValue = {
+  value: string;
+  description?: string;
 };
 

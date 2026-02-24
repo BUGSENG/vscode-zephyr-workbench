@@ -4,6 +4,7 @@ import {
   EclairTemplate,
   EclairTemplateKind,
   EclairTemplateOption,
+  EclairTemplateSelectValue,
 } from "./template";
 
 
@@ -13,23 +14,34 @@ function is_record(value: unknown): value is Record<string, unknown> {
 
 export function extract_yaml_from_ecl_content(ecl_text: string): string | undefined {
   const lines = ecl_text.split(/\r?\n/);
-  const start_markers = new Set(["'meta", "'meta:", "'ECL", "'ECL:"]);
+
+  // New syntax: YAML is embedded in a fenced code block:
+  // ```ECL:
+  // title: ...
+  // ```
+  // The closing fence must use the same number of backticks as the opening.
+  const open_re = /^(?<ticks>`{3,})\s*ECL:\s*$/;
+
   let start_index = -1;
+  let closing_fence: string | undefined;
 
   for (let i = 0; i < lines.length; i += 1) {
-    if (start_markers.has(lines[i].trim())) {
+    const trimmed = lines[i].trim();
+    const m = trimmed.match(open_re);
+    if (m?.groups?.ticks) {
       start_index = i + 1;
+      closing_fence = m.groups.ticks;
       break;
     }
   }
 
-  if (start_index === -1) {
+  if (start_index === -1 || !closing_fence) {
     return undefined;
   }
 
   let end_index = -1;
   for (let i = start_index; i < lines.length; i += 1) {
-    if (lines[i].trim() === "'") {
+    if (lines[i].trim() === closing_fence) {
       end_index = i;
       break;
     }
@@ -151,7 +163,46 @@ function parse_option(value: unknown): EclairTemplateOption {
     };
   }
 
-  throw new Error("Invalid template: option.kind must be 'group' or 'flag'");
+  if (kind === "select") {
+    const values_raw = typeof kind_value === "string" ? value.values : kind_value.values;
+    if (!Array.isArray(values_raw) || values_raw.length === 0) {
+      throw new Error("Invalid template: select option requires non-empty values array");
+    }
+    const values = values_raw.map((item, index): EclairTemplateSelectValue => {
+      if (typeof item === "string") {
+        return { value: item };
+      }
+      if (!is_record(item)) {
+        throw new Error(`Invalid template: select option values[${index}] must be a string or object`);
+      }
+      const item_value = parse_string(item.value, `select option values[${index}].value`);
+      const description = item.description;
+      if (description !== undefined && typeof description !== "string") {
+        throw new Error(`Invalid template: select option values[${index}].description must be a string`);
+      }
+      return description === undefined ? { value: item_value } : { value: item_value, description };
+    });
+
+    const default_value = typeof kind_value === "string" ? value.default : kind_value.default;
+    if (typeof default_value !== "string") {
+      throw new Error("Invalid template: select option default must be a string");
+    }
+    if (!values.some((item) => item.value === default_value)) {
+      throw new Error("Invalid template: select option default must be one of the values");
+    }
+
+    return {
+      id,
+      title,
+      variant: {
+        kind: "select",
+        values,
+        default: default_value,
+      },
+    };
+  }
+
+  throw new Error("Invalid template: option.kind must be 'group', 'flag', or 'select'");
 }
 
 function parse_options(value: unknown): EclairTemplateOption[] {
@@ -194,63 +245,112 @@ export function parse_eclair_template_from_any(data: unknown): EclairTemplate {
   };
 }
 
-type ResolvedFlags = {
-  flags: Map<string, boolean>;
-  flag_order: string[];
-};
-
-function resolve_flags(
-  template: EclairTemplate,
-  selected_options: Record<string, boolean>,
-): ResolvedFlags {
-  const flags = new Map<string, boolean>();
-  const flag_order: string[] = [];
-
-  const collect_flags = (options: EclairTemplateOption[]) => {
-    for (const option of options) {
-      if (option.variant.kind === "group") {
-        collect_flags(option.variant.children);
-      } else {
-        flags.set(option.id, option.variant.default ?? false);
-        flag_order.push(option.id);
-      }
-    }
-  };
-
-  collect_flags(template.options);
-
-  for (const flag_id in selected_options) {
-    const enabled = selected_options[flag_id];
-    if (!flags.has(flag_id)) {
-      throw new Error(`Unknown flag: ${flag_id}`);
-    }
-    flags.set(flag_id, enabled);
-  }
-
-  return { flags, flag_order };
-}
-
-export function format_flag_settings(
-  template: EclairTemplate,
-  selected_options: Record<string, boolean>,
-): EclairSetFlag[] {
-  const { flags, flag_order } = resolve_flags(template, selected_options);
-  return flag_order.map((flag_id) => {
-    const ecl_id = flag_to_ecl_identifier(flag_id);
-    return {
-      flag_id,
-      ecl_id,
-      source: selected_options[flag_id] === undefined ? "default" : "user",
-      statement: `setq(${ecl_id},${flags.get(flag_id) ? "1" : "nil"})`,
-    };
-  });
-}
+export type OptionValue = boolean | string;
+export type EclairOptionSetting = EclairSetFlag | EclairSetSelect;
 
 export interface EclairSetFlag {
+  kind: "flag";
   flag_id: string;
   ecl_id: string;
   source: "default" | "user";
   statement: string,
+}
+
+export interface EclairSetSelect {
+  kind: "select";
+  option_id: string;
+  ecl_id: string;
+  source: "default" | "user";
+  value: string;
+  statement: string;
+}
+
+type ResolvedOptionSettings = {
+  flags: Map<string, boolean>;
+  selects: Map<string, string>;
+  order: { kind: "flag" | "select"; id: string }[];
+  select_values: Map<string, string[]>;
+};
+
+function resolve_option_settings(
+  template: EclairTemplate,
+  selected_options: Record<string, OptionValue>,
+): ResolvedOptionSettings {
+  const flags = new Map<string, boolean>();
+  const selects = new Map<string, string>();
+  const order: { kind: "flag" | "select"; id: string }[] = [];
+  const select_values = new Map<string, string[]>();
+
+  const collect = (options: EclairTemplateOption[]) => {
+    for (const option of options) {
+      if (option.variant.kind === "group") {
+        collect(option.variant.children);
+      } else if (option.variant.kind === "flag") {
+        flags.set(option.id, option.variant.default ?? false);
+        order.push({ kind: "flag", id: option.id });
+      } else if (option.variant.kind === "select") {
+        select_values.set(option.id, option.variant.values.map((item) => item.value));
+        selects.set(option.id, option.variant.default);
+        order.push({ kind: "select", id: option.id });
+      }
+    }
+  };
+
+  collect(template.options);
+
+  for (const option_id in selected_options) {
+    const value = selected_options[option_id];
+    if (typeof value === "boolean") {
+      if (!flags.has(option_id)) {
+        throw new Error(`Unknown flag: ${option_id}`);
+      }
+      flags.set(option_id, value);
+    } else if (typeof value === "string") {
+      const allowed = select_values.get(option_id);
+      if (!allowed) {
+        throw new Error(`Unknown select option: ${option_id}`);
+      }
+      if (!allowed.includes(value)) {
+        throw new Error(`Invalid value for ${option_id}: ${value}`);
+      }
+      selects.set(option_id, value);
+    }
+  }
+
+  return { flags, selects, order, select_values };
+}
+
+export function format_option_settings(
+  template: EclairTemplate,
+  selected_options: Record<string, OptionValue>,
+): EclairOptionSetting[] {
+  const { flags, selects, order } = resolve_option_settings(template, selected_options);
+  return order.flatMap((entry): EclairOptionSetting[] => {
+    if (entry.kind === "flag") {
+      const ecl_id = flag_to_ecl_identifier(entry.id);
+      return [{
+        kind: "flag",
+        flag_id: entry.id,
+        ecl_id,
+        source: selected_options[entry.id] === undefined ? "default" : "user",
+        statement: `-setq=${ecl_id},${flags.get(entry.id) ? "1" : "nil"}`,
+      }];
+    }
+
+    const value = selects.get(entry.id);
+    if (value === undefined) {
+      return [];
+    }
+    const ecl_id = flag_to_ecl_identifier(entry.id);
+    return [{
+      kind: "select",
+      option_id: entry.id,
+      ecl_id,
+      source: selected_options[entry.id] === undefined ? "default" : "user",
+      value,
+      statement: `-setq=${ecl_id},"${value.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"")}"`,
+    }];
+  });
 }
 
 
