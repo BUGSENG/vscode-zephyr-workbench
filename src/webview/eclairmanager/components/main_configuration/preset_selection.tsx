@@ -446,12 +446,11 @@ function TemplateOptionTree({
                 data-tooltip="Reset to default"
                 style={{ position: "relative", display: "inline-flex", marginLeft: "6px" }}
               >
-                <button
-                  type="button"
-                  className="inline-icon-button codicon codicon-discard"
+                <VscodeButton
+                  appearance="icon"
                   aria-label="Reset to default"
                   onClick={() => onClearFlag(option.id)}
-                ></button>
+                ><span className="codicon codicon-discard" /></VscodeButton>
               </span>
             )}
           </div>
@@ -489,31 +488,22 @@ function TemplateOptionTree({
               style={{ marginLeft: "12px", display: "flex", gap: "4px" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                className="inline-icon-button"
+              <VscodeButton
+                appearance="icon"
                 title="Enable all"
-                style={{ fontSize: "0.8em", padding: "1px 6px" }}
                 onClick={() => allFlagIds.forEach((id) => onSetFlag(id, true))}
-              >
-                +
-              </button>
-              <button
+              ><span className="codicon codicon-plus" /></VscodeButton>
+              <VscodeButton
                 type="button"
-                className="inline-icon-button"
+                appearance="icon"
                 title="Disable all"
-                style={{ fontSize: "0.8em", padding: "1px 6px" }}
                 onClick={() => allFlagIds.forEach((id) => onSetFlag(id, false))}
-              >
-                -
-              </button>
-              <button
-                type="button"
-                className="inline-icon-button codicon codicon-discard"
+              ><span className="codicon codicon-chrome-close" /></VscodeButton>
+              <VscodeButton
+                appearance="icon"
                 title="Reset all to default"
-                style={{ fontSize: "0.8em", padding: "1px 6px" }}
                 onClick={() => allFlagIds.forEach((id) => onClearFlag(id))}
-              />
+              ><span className="codicon codicon-discard" /></VscodeButton>
             </div>
           </div>
           {expanded && (

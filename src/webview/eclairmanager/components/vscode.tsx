@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 // Web component wrappers for VSCode UI Toolkit
 export function VscodeButton(
-  props: React.ButtonHTMLAttributes<HTMLButtonElement> & { appearance: "primary" | "secondary" }
+  props: React.ButtonHTMLAttributes<HTMLButtonElement> & { appearance: "primary" | "secondary" | "icon" }
 ) {
   return React.createElement("vscode-button", props, props.children);
 }
