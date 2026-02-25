@@ -230,7 +230,7 @@ export function RichHelpTooltip(props: {
   );
 }
 
-export interface SearchableItem { id: string; name: string; description: string };
+export interface SearchableItem { id: string; name: string; description: string | { content: React.ReactNode, searchable?: string } };
 
 export function SearchableDropdown<Item extends SearchableItem>(props: {
   id: string;
@@ -244,10 +244,13 @@ export function SearchableDropdown<Item extends SearchableItem>(props: {
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const [showDropdown, setShowDropdown] = React.useState<boolean>(false);
 
-  const filteredItems = props.items.filter((item) =>
-    item.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredItems = props.items.filter((item) => {
+    const description = typeof item.description === "string" ? item.description : item.description.searchable ?? "";
+    return (
+      item.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      description.toLowerCase().includes(searchText.toLowerCase())
+    );
+  });
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -331,7 +334,7 @@ export function SearchableDropdown<Item extends SearchableItem>(props: {
                 >
                   <div style={{ fontWeight: 500 }}>{item.name}</div>
                   <div style={{ fontSize: '0.9em', color: 'var(--vscode-descriptionForeground)' }}>
-                    {item.description}
+                    {typeof item.description === "string" ? item.description : item.description.content}
                   </div>
                 </div>
               ))

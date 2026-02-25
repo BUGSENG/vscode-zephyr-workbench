@@ -41,7 +41,6 @@ export function PresetSelection(props: {
 
     <h3>
       Ruleset selection
-      <SimpleHelpTooltip text="Select a base ruleset that defines the default set of checks for the analysis." />
       <RichHelpTooltip>
         <div style={{ fontWeight: 600, marginBottom: "4px" }}>Ruleset info</div>
         <div style={{ fontSize: "0.9em" }}>
@@ -216,6 +215,7 @@ function MultiPresetSelection(props: {
         kind={props.kind}
         available_presets={props.available_presets}
         edit_path={props.state.edit_path}
+        already_selected_sources={presets.map(p => p.source)}
         dispatch_state={props.dispatch_state}
         post_message={props.post_message}
         onPresetSelected={() => setShowPicker(false)}
@@ -228,6 +228,7 @@ function PresetPicker(props: {
   kind: EclairTemplateKind;
   available_presets: AvailablePresetsState;
   edit_path: string;
+  already_selected_sources?: EclairPresetTemplateSource[];
   dispatch_state: React.Dispatch<EclairStateAction>;
   post_message: (message: WebviewMessage) => void;
   onPresetSelected?: () => void;
@@ -244,10 +245,19 @@ function PresetPicker(props: {
       if (preset.kind !== props.kind) {
         continue;
       }
+      if (props.already_selected_sources?.some(s => sources_are_equal(s, { type: "system-path", path }))) {
+        continue;
+      }
       items.push({
         id: path,
         name: preset.title,
-        description: preset.description,
+        description: {
+          content: (<>
+            <EasyMark text={preset.description.split("\n\n")[0]}/>
+            Path: {path}
+          </>),
+          searchable: `Path: ${path} ${typeof preset.description === "string" ? preset.description : ""}`,
+        },
         source: { type: "system-path", path },
       });
     }
@@ -259,16 +269,25 @@ function PresetPicker(props: {
         if (preset.kind !== props.kind) {
           continue;
         }
+        if (props.already_selected_sources?.some(s => sources_are_equal(s, { type: "repo-path", repo, path }))) {
+          continue;
+        }
         items.push({
           id: `${repo}:${path}`,
           name: preset.title,
-          description: preset.description,
+          description: {
+            content: (<>
+              <EasyMark text={preset.description.split("\n\n")[0]}/>
+              Repo: {repo}, Path: {path}
+            </>),
+            searchable: `Repo: ${repo}, Path: ${path} ${typeof preset.description === "string" ? preset.description : ""}`,
+          },
           source: { type: "repo-path", repo, path },
         });
       }
     }
     return items;
-  }, [props.available_presets]);
+  }, [props.available_presets, props.already_selected_sources, props.kind]);
 
   return (<div style={{ 
     marginTop: '10px', 
@@ -340,7 +359,7 @@ function PresetSettings({
 }) {
   return (<div style={{ marginTop: "8px" }}>
     <div><strong>{template.title}</strong></div>
-    <div style={{ fontSize: "0.9em", color: "var(--vscode-descriptionForeground)" }}><EasyMark text={template.description} /></div>
+    <div style={{ color: "var(--vscode-descriptionForeground)" }}><EasyMark text={template.description} /></div>
 
     {template.options.length > 0 && (
       <details style={{ marginTop: "8px" }}>
@@ -412,18 +431,19 @@ function TemplateOptionTree({
     marginBottom: "4px",
   };
 
-  const modified_star = (<span style={{ marginLeft: "3px", marginRight: "6px", color: "var(--vscode-descriptionForeground)" }}>
+  const modified_star = (<span style={{ marginLeft: "3px", marginRight: "3px" }}>
     *
   </span>);
 
   const OptionTitle = ({ modified }: { modified: boolean }) => {
     if (option.title && option.title !== option.id) {
       return (<>
-        <span style={{ marginRight: "8px", color: "var(--vscode-descriptionForeground)", fontSize: "0.9em" }}>
-          ({option.id})
+        <span style={{ marginRight: "8px" }}>
+          {option.id}{modified && modified_star}:
         </span>
-        {modified && modified_star}
-        <EasyMarkInline text={option.title} />
+        <span style={{ color: "var(--vscode-descriptionForeground)" }}>
+          <EasyMarkInline text={option.title} />
+        </span>
         {option.description && (<RichHelpTooltip><EasyMark text={option.description} /></RichHelpTooltip>)}
       </>);
     } else {
@@ -545,6 +565,23 @@ function TemplateOptionTree({
           </div>
         </div>
       );
+    })
+    .exhaustive();
+}
+
+function sources_are_equal(s1: EclairPresetTemplateSource, s2: EclairPresetTemplateSource): boolean {
+  if (s1.type !== s2.type) {
+    return false;
+  }
+
+  return match(s1)
+    .with({ type: "system-path" }, (s1) => {
+      const s2_casted = s2 as Extract<EclairPresetTemplateSource, { type: "system-path" }>;
+      return s1.path === s2_casted.path;
+    })
+    .with({ type: "repo-path" }, (s1) => {
+      const s2_casted = s2 as Extract<EclairPresetTemplateSource, { type: "repo-path" }>;
+      return s1.repo === s2_casted.repo && s1.path === s2_casted.path;
     })
     .exhaustive();
 }
