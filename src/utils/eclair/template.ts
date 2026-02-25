@@ -18,6 +18,7 @@ export type EclairTemplateKind = typeof all_eclair_template_kinds[number];
 export type EclairTemplateOption = {
   id: string;
   title?: string;
+  description?: string;
   variant: EclairTemplateOptionVariant;
 };
 

@@ -123,8 +123,8 @@ function parse_option(value: unknown): EclairTemplateOption {
   }
 
   const id = parse_string(value.id, "option.id");
-  const title = typeof value.title === "string" ? value.title :
-    (typeof value.description === "string" ? value.description : undefined);
+  const title = typeof value.title === "string" ? value.title : undefined;
+  const description = typeof value.description === "string" ? value.description : undefined;
 
   const kind_value = value.kind ?? value.variant;
   if (!is_record(kind_value) && typeof kind_value !== "string") {
@@ -141,6 +141,7 @@ function parse_option(value: unknown): EclairTemplateOption {
     return {
       id,
       title,
+      description,
       variant: {
         kind: "group",
         children,
@@ -156,6 +157,7 @@ function parse_option(value: unknown): EclairTemplateOption {
     return {
       id,
       title,
+      description,
       variant: {
         kind: "flag",
         default: default_value,
@@ -194,6 +196,7 @@ function parse_option(value: unknown): EclairTemplateOption {
     return {
       id,
       title,
+      description,
       variant: {
         kind: "select",
         values,

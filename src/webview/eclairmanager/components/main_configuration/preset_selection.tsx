@@ -340,8 +340,8 @@ function PresetSettings({
 }) {
   return (<div style={{ marginTop: "8px" }}>
     <div><strong>{template.title}</strong></div>
-    <div style={{ fontSize: "0.9em", color: "var(--vscode-descriptionForeground)" }}><BlockMd text={template.description} /></div>
-    
+    <div style={{ fontSize: "0.9em", color: "var(--vscode-descriptionForeground)" }}><EasyMark text={template.description} /></div>
+
     {template.options.length > 0 && (
       <details style={{ marginTop: "8px" }}>
         <summary style={{ cursor: "pointer", userSelect: "none" }}>
@@ -423,7 +423,8 @@ function TemplateOptionTree({
           ({option.id})
         </span>
         {modified && modified_star}
-        <InlineMd text={option.title} />
+        <EasyMarkInline text={option.title} />
+        {option.description && (<RichHelpTooltip><EasyMark text={option.description} /></RichHelpTooltip>)}
       </>);
     } else {
       return (<>
@@ -546,12 +547,4 @@ function TemplateOptionTree({
       );
     })
     .exhaustive();
-}
-
-function InlineMd({ text }: { text: string }) {
-  return <EasyMarkInline text={text} />;
-}
-
-function BlockMd({ text }: { text: string }) {
-  return <EasyMark text={text} />;
 }
