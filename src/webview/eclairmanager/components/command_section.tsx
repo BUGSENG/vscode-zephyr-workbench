@@ -1,5 +1,5 @@
 import React from "react";
-import { VscodeButton, VscodeAlert } from "./vscode";
+import { VscodeButton, VscodeAlert } from "./common_components";
 import { WebviewMessage } from "../../../utils/eclairEvent";
 import { EclairScaConfig } from "../../../utils/eclair/config";
 import { Result } from "../../../utils/typing_utils";

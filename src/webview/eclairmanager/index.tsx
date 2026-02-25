@@ -11,7 +11,7 @@ import { MainAnalysisConfigurationSection } from "./components/main_configuratio
 import { match } from "ts-pattern";
 import { EclairRepos, EclairScaConfig, EclairScaMainConfig, EclairScaPresetConfig } from "../../utils/eclair/config.js";
 import { Result } from "../../utils/typing_utils.js";
-import { RichHelpTooltip } from "./components/vscode.js";
+import { RichHelpTooltip } from "./components/common_components.js";
 import { enableMapSet } from "immer";
 
 const BODY_ID = "eclair-manager-body";

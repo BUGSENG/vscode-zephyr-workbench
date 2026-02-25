@@ -1,6 +1,6 @@
 import React from "react";
 import { ReportsState, EclairStateAction } from "../state";
-import { VscodeCheckbox } from "./vscode";
+import { VscodeCheckbox } from "./common_components";
 
 export function ReportsSection(props: {
   reports: ReportsState;

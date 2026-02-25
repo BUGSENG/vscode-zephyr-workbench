@@ -1,7 +1,7 @@
 import React, { JSX } from "react";
 import { WebviewMessage } from "../../../utils/eclairEvent";
 import { BUGSENG_REPO_LINK, EclairState, EclairStateAction, ZephyrRulesetState } from "../state";
-import { Monospace, RichHelpTooltip, VscodeRadio, VscodeRadioGroup } from "./vscode";
+import { Monospace, RichHelpTooltip, VscodeRadio, VscodeRadioGroup } from "./common_components";
 import { RulesetSection } from "./main_configuration/ruleset_section";
 import { CustomEclSection } from "./main_configuration/custom_ecl";
 import { PresetSelection } from "./main_configuration/preset_selection";

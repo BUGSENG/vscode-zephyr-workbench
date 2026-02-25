@@ -1,6 +1,6 @@
 import React from "react";
 import { ZephyrRulesetState, EclairStateAction } from "../../state";
-import { PickPath, VscodeButton, VscodeRadio, VscodeRadioGroup, VscodeTextField } from "../vscode";
+import { PickPath, VscodeButton, VscodeRadio, VscodeRadioGroup, VscodeTextField } from "../common_components";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
 
 export function RulesetSection(props: {

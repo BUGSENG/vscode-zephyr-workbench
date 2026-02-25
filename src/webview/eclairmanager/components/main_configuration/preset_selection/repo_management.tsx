@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { EclairRepos } from "../../../../../utils/eclair/config";
 import { AvailablePresetsState, EclairStateAction, RepoScanState } from "../../../state";
 import { WebviewMessage } from "../../../../../utils/eclairEvent";
-import { StatusBadge, StatusBadgeState, VscodeBadge, VscodeButton, VscodePanel, VscodeTextField } from "../../vscode";
+import { StatusBadge, StatusBadgeState, VscodeBadge, VscodeButton, VscodePanel, VscodeTextField } from "../../common_components";
 
 const EMPTY_REPO_FORM = { name: "", origin: "", rev: "" };
 

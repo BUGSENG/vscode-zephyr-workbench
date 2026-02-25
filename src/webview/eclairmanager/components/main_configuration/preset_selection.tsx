@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
 import { AvailablePresetsState, BUGSENG_REPO_LINK, EclairStateAction, get_preset_template_by_source, MultiPresetSelectionState, PresetsSelectionState, RepoScanState, SinglePresetSelectionState } from "../../state";
-import { PickPath, SearchableDropdown, SearchableItem, StatusBadge, StatusBadgeState, VscodeAlert, VscodeBadge, VscodeButton, VscodeCheckbox, VscodePanel, SimpleHelpTooltip, RichHelpTooltip, VscodeTextField, Monospace, VscodeDropdown, VscodeOption } from "../vscode";
+import { PickPath, SearchableDropdown, SearchableItem, VscodeAlert, VscodeBadge, VscodeButton, VscodeCheckbox, VscodePanel, RichHelpTooltip, Monospace, VscodeDropdown, VscodeOption } from "../common_components";
 import { EclairTemplate, EclairTemplateKind, EclairTemplateOption } from "../../../../utils/eclair/template";
 import { EclairPresetTemplateSource, EclairRepos, PresetSelectionState } from "../../../../utils/eclair/config";
 import { RepoManagementSection } from "./preset_selection/repo_management";

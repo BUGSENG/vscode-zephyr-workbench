@@ -14,9 +14,8 @@ import { extract_yaml_from_ecl_content, format_option_settings, parse_eclair_tem
 import { ALL_ECLAIR_REPORTS, EclairPresetTemplateSource, EclairRepos, EclairScaConfig, EclairScaZephyrRulesetConfig, PresetSelectionState } from "../utils/eclair/config";
 import { ensureRepoCheckout, deleteRepoCheckout } from "./EclairManagerPanel/repo_manage";
 import { Result, unwrap_or_throw } from "../utils/typing_utils";
-import { EclairTemplate } from "../utils/eclair/template";
 import { match } from "ts-pattern";
-import { load_preset_from_path, load_preset_from_ref, load_preset_from_repo } from "./EclairManagerPanel/templates";
+import { load_preset_from_ref } from "./EclairManagerPanel/templates";
 
 export class EclairManagerPanel {
   /**

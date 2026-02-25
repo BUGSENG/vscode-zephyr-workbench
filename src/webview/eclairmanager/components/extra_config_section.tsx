@@ -1,6 +1,6 @@
 import React from "react";
 import { ExtraConfigState, EclairStateAction } from "../state";
-import { PickPath } from "./vscode";
+import { PickPath } from "./common_components";
 import { WebviewMessage } from "../../../utils/eclairEvent";
 
 export function ExtraConfigSection(props: {

@@ -1,7 +1,7 @@
 import React from "react";
 import { WebviewMessage } from "../../../../utils/eclairEvent";
 import { CustomEclState, EclairStateAction } from "../../state";
-import { PickPath } from "../vscode";
+import { PickPath } from "../common_components";
 
 export function CustomEclSection({
   state,

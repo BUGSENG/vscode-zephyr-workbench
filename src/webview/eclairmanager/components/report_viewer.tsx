@@ -1,6 +1,6 @@
 import React from "react";
 import { ReportServerState } from "../state";
-import { VscodeButton } from "./vscode";
+import { VscodeButton } from "./common_components";
 import { WebviewMessage } from "../../../utils/eclairEvent";
 
 export function ReportViewerSection(props: {

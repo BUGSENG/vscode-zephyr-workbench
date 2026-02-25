@@ -1,6 +1,6 @@
 import React from "react";
 import { StatusState, InstallPathState, EclairStateAction } from "../state";
-import { VscodeButton, PickPath } from "./vscode";
+import { VscodeButton, PickPath } from "./common_components";
 import { WebviewMessage } from "../../../utils/eclairEvent";
 
 export function Summary(props: {
