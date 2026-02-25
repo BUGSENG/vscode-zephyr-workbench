@@ -6,6 +6,7 @@ import { EclairTemplate, EclairTemplateKind, EclairTemplateOption } from "../../
 import { EclairPresetTemplateSource, EclairRepos, PresetSelectionState } from "../../../../utils/eclair/config";
 import { RepoManagementSection } from "./preset_selection/repo_management";
 import { match } from "ts-pattern";
+import { EasyMark, EasyMarkInline } from "../easymark_render.js";
 
 export function PresetSelection(props: {
   state: PresetsSelectionState;
@@ -339,7 +340,7 @@ function PresetSettings({
 }) {
   return (<div style={{ marginTop: "8px" }}>
     <div><strong>{template.title}</strong></div>
-    <div style={{ fontSize: "0.9em", color: "var(--vscode-descriptionForeground)" }}>{template.description}</div>
+    <div style={{ fontSize: "0.9em", color: "var(--vscode-descriptionForeground)" }}><BlockMd text={template.description} /></div>
     
     {template.options.length > 0 && (
       <details style={{ marginTop: "8px" }}>
@@ -411,7 +412,7 @@ function TemplateOptionTree({
     marginBottom: "4px",
   };
 
-  const modified_star = (<span style={{ marginLeft: "6px", color: "var(--vscode-descriptionForeground)" }}>
+  const modified_star = (<span style={{ marginLeft: "3px", marginRight: "6px", color: "var(--vscode-descriptionForeground)" }}>
     *
   </span>);
 
@@ -422,7 +423,7 @@ function TemplateOptionTree({
           ({option.id})
         </span>
         {modified && modified_star}
-        <span>{option.title}</span>
+        <InlineMd text={option.title} />
       </>);
     } else {
       return (<>
@@ -545,4 +546,12 @@ function TemplateOptionTree({
       );
     })
     .exhaustive();
+}
+
+function InlineMd({ text }: { text: string }) {
+  return <EasyMarkInline text={text} />;
+}
+
+function BlockMd({ text }: { text: string }) {
+  return <EasyMark text={text} />;
 }
