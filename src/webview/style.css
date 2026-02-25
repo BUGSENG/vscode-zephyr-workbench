@@ -538,6 +538,7 @@ vscode-button {
   max-width: 90vw;
   border-radius: 6px;
   background: var(--vscode-editorHoverWidget-background);
+  overflow: hidden;
   color: var(--vscode-editorHoverWidget-foreground);
   border: 1px solid var(--vscode-editorHoverWidget-border);
   padding: 8px 10px;
