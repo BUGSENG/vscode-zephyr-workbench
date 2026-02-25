@@ -11,7 +11,7 @@ import { getExtraPaths, normalizePath, setExtraPath } from "../utils/envYamlUtil
 import type { IEclairExtension } from "../ext/eclair_api";
 import type { ExtensionMessage, WebviewMessage } from "../utils/eclairEvent";
 import { extract_yaml_from_ecl_content, format_option_settings, parse_eclair_template_from_any } from "../utils/eclair/template_utils";
-import { ALL_ECLAIR_REPORTS, EclairPresetTemplateSource, EclairRepos, EclairScaConfig, EclairScaZephyrRulesetConfig, PresetSelectionState } from "../utils/eclair/config";
+import { ALL_ECLAIR_REPORTS, EclairPresetTemplateSource, EclairRepos, FullEclairScaConfig, PresetSelectionState } from "../utils/eclair/config";
 import { ensureRepoCheckout, deleteRepoCheckout } from "./EclairManagerPanel/repo_manage";
 import { Result, unwrap_or_throw } from "../utils/typing_utils";
 import { match } from "ts-pattern";
@@ -684,7 +684,13 @@ export class EclairManagerPanel {
 
           const merged_env = await this._get_analysis_env(west_top_dir);
 
-          let cmd = await match(cfg.config)
+          if (!cfg.configs[cfg.current_config_index]) {
+            throw new Error("Could not find configuration at index " + cfg.current_config_index);
+          }
+
+          const config = cfg.configs[cfg.current_config_index];
+
+          let cmd = await match(config.main_config)
             .with({ type: "preset" }, async (c) => {
               const {
                 user_ruleset_name: fake_ruleset_name,
@@ -703,8 +709,8 @@ export class EclairManagerPanel {
                 fake_ruleset_name,
                 fake_ruleset_path,
                 eclair_options,
-                cfg.extra_config,
-                cfg.reports,
+                config.extra_config,
+                config.reports,
                 app_dir,
                 build_dir,
                 board,
@@ -721,8 +727,8 @@ export class EclairManagerPanel {
                 fake_ruleset_name,
                 fake_ruleset_path,
                 [`-eval_file=${c.ecl_path.replace(/\\/g, "/")}`],
-                cfg.extra_config,
-                cfg.reports,
+                config.extra_config,
+                config.reports,
                 app_dir,
                 build_dir,
                 board,
@@ -734,8 +740,8 @@ export class EclairManagerPanel {
                 c.userRulesetName,
                 c.userRulesetPath,
                 [],
-                cfg.extra_config,
-                cfg.reports,
+                config.extra_config,
+                config.reports,
                 app_dir,
                 build_dir,
                 board,
@@ -883,7 +889,7 @@ export class EclairManagerPanel {
       // Expand ${workspaceFolder} tokens that were stored during save
       const resolved = this.deepResolvePaths(raw);
       // Validate the shape before sending; if it doesn't parse, just skip
-      const { EclairScaConfigSchema } = await import("../utils/eclair/config.js");
+      const { FullEclairScaConfigSchema: EclairScaConfigSchema } = await import("../utils/eclair/config.js");
       const parsed = EclairScaConfigSchema.safeParse(resolved);
       if (!parsed.success) {
         console.warn("[EclairManagerPanel] loadScaConfig: saved config failed validation:", parsed.error);
@@ -891,23 +897,25 @@ export class EclairManagerPanel {
       }
       post_message({ command: "set-sca-config", config: parsed.data });
 
-      // If the config references system-path presets, load them now so the
-      // webview has the template content when it renders the restored config.
-      if (parsed.data.config.type === "preset") {
-        const { ruleset, variants, tailorings } = parsed.data.config;
-        const allPresets = [ruleset, ...variants, ...tailorings];
-        for (const p of allPresets) {
-          await load_preset_from_ref(
-            p.source,
-            parsed.data.repos ?? {},
-            (message) => post_message({ command: "preset-content", source: p.source, template: { loading: message } }),
-          ).then(r => {
-            if ("err" in r) {
-              post_message({ command: "preset-content", source: p.source, template: { error: r.err } });
-            } else {
-              post_message({ command: "preset-content", source: p.source, template: r.ok[0] });
-            }
-          });
+      for (const config of parsed.data.configs) {
+        // If the config references system-path presets, load them now so the
+        // webview has the template content when it renders the restored config.
+        if (config.main_config.type === "preset") {
+          const { ruleset, variants, tailorings } = config.main_config;
+          const allPresets = [ruleset, ...variants, ...tailorings];
+          for (const p of allPresets) {
+            await load_preset_from_ref(
+              p.source,
+              parsed.data.repos ?? {},
+              (message) => post_message({ command: "preset-content", source: p.source, template: { loading: message } }),
+            ).then(r => {
+              if ("err" in r) {
+                post_message({ command: "preset-content", source: p.source, template: { error: r.err } });
+              } else {
+                post_message({ command: "preset-content", source: p.source, template: r.ok[0] });
+              }
+            });
+          }
         }
       }
 
@@ -950,7 +958,7 @@ export class EclairManagerPanel {
     );
   }
 
-  private async saveScaConfig(cfg: EclairScaConfig) {
+  private async saveScaConfig(cfg: FullEclairScaConfig) {
     const folderUri = this.resolveApplicationFolderUri();
     if (!folderUri) return;
 

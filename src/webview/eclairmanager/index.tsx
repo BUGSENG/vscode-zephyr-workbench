@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useReducer } from "react";
+import React, { useState, useEffect, useCallback, useReducer, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import type { ExtensionMessage, WebviewMessage } from "../../utils/eclairEvent.js";
-import { AnalysisConfigurationState, EclairState, EclairStateAction, ExtraConfigState, InstallPathState, PresetsSelectionState, ReportsState, default_eclair_state, default_ruleset_state, eclairReducer } from "./state.js";
+import { MainAnalysisConfigurationState, EclairState, EclairStateAction, ExtraConfigState, InstallPathState, PresetsSelectionState, ReportsState, default_eclair_state, default_ruleset_state, eclairReducer, EclairConfig } from "./state.js";
 import { Summary } from "./components/summary.js";
 import { ReportsSection } from "./components/reports_section.js";
 import { ExtraConfigSection } from "./components/extra_config_section.js";
@@ -9,9 +9,10 @@ import { CommandSection } from "./components/command_section.js";
 import { ReportViewerSection } from "./components/report_viewer.js";
 import { MainAnalysisConfigurationSection } from "./components/main_configuration.js";
 import { match } from "ts-pattern";
-import { EclairRepos, EclairScaConfig, EclairScaMainConfig, EclairScaPresetConfig } from "../../utils/eclair/config.js";
+import { EclairRepos, FullEclairScaConfig, EclairScaMainConfig, EclairScaPresetConfig, EclairScaConfig } from "../../utils/eclair/config.js";
 import { Result } from "../../utils/typing_utils.js";
-import { RichHelpTooltip } from "./components/common_components.js";
+import { EditableTextField, RichHelpTooltip, SearchableDropdown, VscodeButton, VscodePanel } from "./components/common_components.js";
+import { EasyMark } from "./components/easymark_render.js";
 import { enableMapSet } from "immer";
 
 const BODY_ID = "eclair-manager-body";
@@ -36,7 +37,7 @@ export async function main() {
 function EclairManagerPanel() {
   const [api] = useState(() => acquireVsCodeApi());
   const [state, dispatch_state] = useReducer(eclairReducer, default_eclair_state());
-  const [collected_config, set_collected_config] = useState<Result<EclairScaConfig, string>>({ err: "Not configured" });
+  const [collected_config, set_collected_config] = useState<Result<FullEclairScaConfig, string>>({ err: "Not configured" });
 
   const post_message = useCallback((message: WebviewMessage) => {
     api.postMessage(message);
@@ -51,9 +52,8 @@ function EclairManagerPanel() {
     try {
       let config = collect_config_from_state({
         install_path: state.install_path,
-        analysis_configuration: state.analysis_configuration,
-        extra_config: state.extra_config,
-        reports: state.reports,
+        configs: state.configs,
+        current_config_index: state.current_config_index,
         repos: state.repos,
       });
       set_collected_config({ ok: config });
@@ -62,9 +62,8 @@ function EclairManagerPanel() {
     }
   }, [
     state.install_path,
-    state.analysis_configuration,
-    state.extra_config,
-    state.reports,
+    state.configs,
+    state.current_config_index,
     state.repos,
   ]);
 
@@ -83,6 +82,11 @@ function EclairManagerPanel() {
       console.error("Failed to post message to VSCode extension backend:", e);
     }
   }, [post_message]);
+
+  const current: EclairConfig | undefined = state.configs[state.current_config_index];
+
+  const config_items = useMemo(() => state.configs.map((config, index) => ({ id: index, name: config.name, description: "", index })), [state.configs]);
+  const current_config_item = config_items[state.current_config_index];
 
   return (
     <div>
@@ -105,22 +109,77 @@ function EclairManagerPanel() {
         dispatch_state={dispatch_state}
       />
 
-      <MainAnalysisConfigurationSection
-        state={state}
-        dispatch_state={dispatch_state}
-        post_message={post_message}
-      />
 
-      <ReportsSection
-        reports={state.reports}
-        dispatch_state={dispatch_state}
-      />
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+        Configuration:
+        <SearchableDropdown
+          id="configuration-selector"
+          label=""
+          placeholder="Select configuration"
+          items={config_items}
+          selectedItem={current_config_item || null}
+          onSelectItem={(item) => dispatch_state({ type: "select-configuration", index: item.index })}
+        />
+        <VscodeButton
+          appearance="primary"
+          onClick={() => {
+            dispatch_state({ type: "add-new-configuration", name: `Config ${state.configs.length + 1}` });
+          }}
+        >
+          New
+        </VscodeButton>
+        {current && (
+          <VscodeButton
+            appearance="secondary"
+            onClick={() => {
+              dispatch_state({ type: "delete-configuration", index: state.current_config_index });
+            }}
+          >
+            <span className="codicon codicon-trash" />
+          </VscodeButton>
+        )/* TODO maybe an export/import button */}
+      </div>
 
-      <ExtraConfigSection
-        extra_config={state.extra_config}
-        dispatch_state={dispatch_state}
-        post_message={post_message}
-      />
+      {current && (<>
+        <div style={{ margin: "8px" }}>
+          <EditableTextField
+            name="Name"
+            value={current.name}
+            placeholder="Configuration name"
+            style={{ margin: "0", maxWidth: "10em", flexShrink: 1 }}
+            on_selected={(new_name) => {
+              const trimmed = new_name.trim();
+              if (!trimmed || trimmed === current.name) {
+                return;
+              }
+              dispatch_state({ type: "update-configuration-name", name: trimmed });
+            }}
+          />
+        </div>
+
+        <EditableConfigDescription
+          value={current.description_md}
+          onSave={(description_md) => dispatch_state({ type: "update-configuration-description", description_md })}
+        />
+
+        <MainAnalysisConfigurationSection
+          state={state}
+          current={current}
+          dispatch_state={dispatch_state}
+          post_message={post_message}
+        />
+
+        <ReportsSection
+          reports={current.reports}
+          dispatch_state={dispatch_state}
+        />
+
+        <ExtraConfigSection
+          extra_config={current.extra_config}
+          dispatch_state={dispatch_state}
+          post_message={post_message}
+        />
+      </>)}
 
       <CommandSection
         post_message={post_message}
@@ -171,21 +230,29 @@ function handleMessage(
 
 function collect_config_from_state(state: {
   install_path: InstallPathState,
-  analysis_configuration: AnalysisConfigurationState,
-  extra_config: ExtraConfigState,
-  reports: ReportsState,
+  configs: EclairConfig[],
+  current_config_index: number;
   repos: EclairRepos,
-}): EclairScaConfig {
+}): FullEclairScaConfig {
+  const configs: EclairScaConfig[] = state.configs.map(config => {
+    return {
+      name: config.name,
+      description_md: config.description_md,
+      main_config: collect_eclair_analysis_config(config.main_config),
+      extra_config: config.extra_config.path,
+      reports: config.reports.selected,
+    };
+  });
+
   return {
     install_path: state.install_path.path,
-    extra_config: state.extra_config.path,
-    config: collect_eclair_analysis_config(state.analysis_configuration),
-    reports: state.reports.selected,
+    configs: configs,
+    current_config_index: state.current_config_index,
     repos: state.repos,
   };
 }
 
-function collect_eclair_analysis_config(config: AnalysisConfigurationState): EclairScaMainConfig {
+function collect_eclair_analysis_config(config: MainAnalysisConfigurationState): EclairScaMainConfig {
   return match(config)
     .with({ type: "preset" }, (cfg) => {
       const state = cfg.state;
@@ -223,3 +290,82 @@ function collect_eclair_sca_preset_config(state: PresetsSelectionState): EclairS
   };
 }
 
+
+
+function EditableConfigDescription(props: { value: string; onSave: (description_md: string) => void }) {
+  const [editing, set_editing] = useState<boolean>(false);
+  const [draft, set_draft] = useState<string>(props.value);
+
+  // Reset local UI state when switching configurations.
+  useEffect(() => {
+    set_editing(false);
+    set_draft(props.value);
+  }, [props.value]);
+
+  return (<VscodePanel style={{ marginBottom: "12px" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+      <h2 style={{ margin: 0, fontSize: "1.1em" }}>Notes</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <VscodeButton
+          appearance="icon"
+          title={editing ? "Save notes" : "Edit notes"}
+          aria-label={editing ? "Save notes" : "Edit notes"}
+          onClick={() => {
+            if (editing) {
+              props.onSave(draft);
+              set_editing(false);
+            } else {
+              set_draft(props.value);
+              set_editing(true);
+            }
+          }}
+        >
+          <span className={`codicon ${editing ? "codicon-check" : "codicon-edit"}`} aria-hidden="true" />
+        </VscodeButton>
+        {editing && (
+          <VscodeButton
+            appearance="icon"
+            title="Cancel"
+            aria-label="Cancel"
+            onClick={() => {
+              set_draft(props.value);
+              set_editing(false);
+            }}
+          >
+            <span className="codicon codicon-x" aria-hidden="true" />
+          </VscodeButton>
+        )}
+      </div>
+    </div>
+
+    {!editing ? (
+      props.value.trim() ? (
+        <div style={{ marginTop: "8px" }}>
+          <EasyMark text={props.value} />
+        </div>
+      ) : (
+        <div style={{ marginTop: "8px", color: "var(--vscode-descriptionForeground)" }}>
+          No notes.
+        </div>
+      )
+    ) : (
+      <div style={{ marginTop: "8px" }}>
+        {React.createElement("vscode-text-area", {
+          value: draft,
+          rows: 8,
+          resize: "vertical",
+          placeholder: "Write notes in Markdown",
+          style: { width: "100%" },
+          onInput: (e: any) => set_draft(e.target.value),
+          onChange: (e: any) => set_draft(e.target.value),
+          onKeyDown: (e: any) => {
+            if (e.key === "Escape") {
+              set_draft(props.value);
+              set_editing(false);
+            }
+          },
+        })}
+      </div>
+    )}
+  </VscodePanel>);
+}

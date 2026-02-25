@@ -103,12 +103,20 @@ export const EclairReposSchema = z.record(z.string(), EclairRepoEntrySchema);
 export type EclairRepos = z.infer<typeof EclairReposSchema>;
 
 export const EclairScaConfigSchema = z.object({
-  install_path: z.string().optional(),
-  config: EclairScaMainConfigSchema,
+  name: z.string(),
+  description_md: z.string().optional(),
+  main_config: EclairScaMainConfigSchema,
   extra_config: z.string().optional(),
-  // either EclairScaReportOption or "ALL"
   reports: z.array(z.union([z.enum(ALL_ECLAIR_REPORTS), z.literal("ALL")])).optional(),
-  repos: EclairReposSchema.optional(),
 });
 
 export type EclairScaConfig = z.infer<typeof EclairScaConfigSchema>;
+
+export const FullEclairScaConfigSchema = z.object({
+  install_path: z.string().optional(),
+  configs: z.array(EclairScaConfigSchema),
+  current_config_index: z.number(),
+  repos: EclairReposSchema.optional(),
+});
+
+export type FullEclairScaConfig = z.infer<typeof FullEclairScaConfigSchema>;

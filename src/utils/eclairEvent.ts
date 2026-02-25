@@ -1,4 +1,4 @@
-import { EclairPresetTemplateSource, EclairRepos, EclairScaConfig, EclairScaMainConfig } from "./eclair/config";
+import { EclairPresetTemplateSource, EclairRepos, FullEclairScaConfig } from "./eclair/config";
 import { EclairTemplate, EclairTemplateKind } from "./eclair/template";
 
 
@@ -46,7 +46,7 @@ export type ExtensionMessage = {
 } | {
   // Restore the full saved SCA configuration into the webview
   command: "set-sca-config",
-  config: EclairScaConfig,
+  config: FullEclairScaConfig,
 } | {
   /** Sent when the backend begins scanning a repository for preset templates. */
   command: "repo-scan-done",
@@ -76,10 +76,10 @@ export type WebviewMessage = {
   command: "browse-custom-ecl-path",
 } | {
   command: "save-sca-config",
-  config: EclairScaConfig,
+  config: FullEclairScaConfig,
 } | {
   command: "run-command",
-  config: EclairScaConfig,
+  config: FullEclairScaConfig,
 } | {
   command: "start-report-server",
 } | {

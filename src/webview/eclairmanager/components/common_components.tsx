@@ -230,7 +230,7 @@ export function RichHelpTooltip(props: {
   );
 }
 
-export interface SearchableItem { id: string; name: string; description: string | { content: React.ReactNode, searchable?: string } };
+export interface SearchableItem { id: string | number; name: string; description: string | { content: React.ReactNode, searchable?: string } };
 
 export function SearchableDropdown<Item extends SearchableItem>(props: {
   id: string;
@@ -243,6 +243,14 @@ export function SearchableDropdown<Item extends SearchableItem>(props: {
   const [searchText, setSearchText] = React.useState<string>('');
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const [showDropdown, setShowDropdown] = React.useState<boolean>(false);
+
+  const selectedName = props.selectedItem?.name ?? '';
+
+  useEffect(() => {
+    if (!showDropdown) {
+      setSearchText(selectedName);
+    }
+  }, [selectedName, showDropdown]);
 
   const filteredItems = props.items.filter((item) => {
     const description = typeof item.description === "string" ? item.description : item.description.searchable ?? "";
@@ -276,7 +284,10 @@ export function SearchableDropdown<Item extends SearchableItem>(props: {
               setSearchText(e.target.value);
               setShowDropdown(true);
             }}
-            onFocus={() => setShowDropdown(true)}
+            onFocus={() => {
+              setSearchText('');
+              setShowDropdown(true);
+            }}
             style={{
               width: '100%',
               padding: '4px 24px 4px 8px',
@@ -387,11 +398,13 @@ export function PickPath({
       style={{ flexGrow: 1 }}
       value={current_value}
       disabled={!editing}
+      onInput={(e: any) => set_current_value(e.target.value)}
       onChange={(e: any) => set_current_value(e.target.value)}
       onKeyDown={(e: any) => {
         if (e.key === "Enter" && editing) {
+          const submitted = (e.target as any)?.value ?? current_value;
           set_editing(false);
-          on_selected(current_value);
+          on_selected(submitted);
         } else if (e.key === "Escape" && editing) {
           set_current_value(value);
           set_editing(false);
@@ -434,6 +447,83 @@ export function PickPath({
       </VscodeButton>
     )}
   </div>);
+}
+
+export function EditableTextField({
+  value,
+  name,
+  placeholder,
+  style,
+  on_selected,
+}: {
+  value: string;
+  name?: string;
+  placeholder?: string;
+  style?: React.CSSProperties;
+  on_selected: (new_value: string) => void;
+}) {
+  const [current_value, set_current_value] = useState<string>(value);
+  const [editing, set_editing] = useState<boolean>(false);
+
+  useEffect(() => {
+    set_current_value(value);
+  }, [value]);
+
+  if (!editing && value !== current_value) {
+    set_current_value(value);
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px", ...style }}>
+      {name ? `${name}:` : "Value:"}
+      <VscodeTextField
+        placeholder={placeholder}
+        size="38"
+        style={{ flexGrow: 1 }}
+        value={current_value}
+        disabled={!editing}
+        onInput={(e: any) => set_current_value(e.target.value)}
+        onChange={(e: any) => set_current_value(e.target.value)}
+        onKeyDown={(e: any) => {
+          if (e.key === "Enter" && editing) {
+            const submitted = (e.target as any)?.value ?? current_value;
+            on_selected(submitted);
+            set_editing(false);
+          } else if (e.key === "Escape" && editing) {
+            set_current_value(value);
+            set_editing(false);
+          }
+        }}
+      />
+
+      <VscodeButton
+        appearance="icon"
+        onClick={() => {
+          if (editing) {
+            on_selected(current_value);
+            set_editing(false);
+          } else {
+            set_editing(true);
+          }
+        }}
+      >
+        <span className={`codicon ${editing ? "codicon-check" : "codicon-edit"}`} aria-hidden="true" />
+      </VscodeButton>
+
+      {editing && (
+        <VscodeButton
+          appearance="icon"
+          onClick={() => {
+            set_current_value(value);
+            set_editing(false);
+          }}
+          style={{ marginLeft: "5px" }}
+        >
+          <span className="codicon codicon-x" aria-hidden="true" />
+        </VscodeButton>
+      )}
+    </div>
+  );
 }
 
 export function Monospace(props: { children: React.ReactNode; style?: React.CSSProperties }) {

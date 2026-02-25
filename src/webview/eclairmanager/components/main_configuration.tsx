@@ -1,6 +1,6 @@
 import React, { JSX } from "react";
 import { WebviewMessage } from "../../../utils/eclairEvent";
-import { BUGSENG_REPO_LINK, EclairState, EclairStateAction, ZephyrRulesetState } from "../state";
+import { BUGSENG_REPO_LINK, EclairConfig, EclairState, EclairStateAction, ZephyrRulesetState } from "../state";
 import { Monospace, RichHelpTooltip, VscodeRadio, VscodeRadioGroup } from "./common_components";
 import { RulesetSection } from "./main_configuration/ruleset_section";
 import { CustomEclSection } from "./main_configuration/custom_ecl";
@@ -10,16 +10,16 @@ import { EclairScaConfigType } from "../../../utils/eclair/config";
 
 export function MainAnalysisConfigurationSection({
   state,
+  current,
   dispatch_state,
   post_message,
 }: {
   state: EclairState;
+  current: EclairConfig,
   dispatch_state: React.Dispatch<EclairStateAction>;
   post_message: (message: WebviewMessage) => void;
 }) {
   const rulesets: EclairScaConfigType[] = ["preset", "custom-ecl", "zephyr-ruleset"];
-
-  const configuration = state.analysis_configuration;
 
   return (
     <div className="section">
@@ -27,7 +27,7 @@ export function MainAnalysisConfigurationSection({
 
       <VscodeRadioGroup
         orientation="vertical"
-        value={state.analysis_configuration.type}
+        value={current.main_config.type}
         onChange={(e: any) => {
           const type = e.target.value as EclairScaConfigType;
           dispatch_state({ type: "update-configuration-type", configurationType: type });
@@ -40,17 +40,17 @@ export function MainAnalysisConfigurationSection({
         ))}
       </VscodeRadioGroup>
 
-      {configuration.type === "zephyr-ruleset" && (
+      {current.main_config.type === "zephyr-ruleset" && (
         <RulesetSection
-          ruleset={configuration.ruleset}
+          ruleset={current.main_config.ruleset}
           dispatch_state={dispatch_state}
           post_message={post_message}
         />
       )}
 
-      {configuration.type === "preset" && (
+      {current.main_config.type === "preset" && (
         <PresetSelection
-          state={configuration.state}
+          state={current.main_config.state}
           available_presets={state.available_presets}
           repos={state.repos}
           repos_scan_state={state.repos_scan_state}
@@ -59,9 +59,9 @@ export function MainAnalysisConfigurationSection({
         />
       )}
 
-      {configuration.type === "custom-ecl" && (
+      {current.main_config.type === "custom-ecl" && (
         <CustomEclSection
-          state={configuration.state}
+          state={current.main_config.state}
           dispatch_state={dispatch_state}
           post_message={post_message}
         />
