@@ -147,7 +147,7 @@ function EclairManagerPanel() {
       </div>
 
       {current && (<>
-        <div style={{ margin: "8px" }}>
+        <VscodePanel style={{ marginBottom: "12px" }}>
           <EditableTextField
             name="Name"
             value={current.name}
@@ -161,12 +161,11 @@ function EclairManagerPanel() {
               dispatch_state({ type: "update-configuration-name", name: trimmed });
             }}
           />
-        </div>
-
-        <EditableConfigDescription
-          value={current.description_md}
-          onSave={(description_md) => dispatch_state({ type: "update-configuration-description", description_md })}
-        />
+          <EditableConfigDescription
+            value={current.description_md}
+            onSave={(description_md) => dispatch_state({ type: "update-configuration-description", description_md })}
+          />
+        </VscodePanel>
 
         <MainAnalysisConfigurationSection
           state={state}
@@ -308,7 +307,7 @@ function EditableConfigDescription(props: { value: string; onSave: (description_
     set_draft(props.value);
   }, [props.value]);
 
-  return (<VscodePanel style={{ marginBottom: "12px" }}>
+  return (<>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
       <h2 style={{ margin: 0, fontSize: "1.1em" }}>Notes</h2>
       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -373,5 +372,5 @@ function EditableConfigDescription(props: { value: string; onSave: (description_
         })}
       </div>
     )}
-  </VscodePanel>);
+  </>);
 }
