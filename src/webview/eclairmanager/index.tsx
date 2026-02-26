@@ -21,10 +21,6 @@ const BODY_ID = "eclair-manager-body";
 declare const acquireVsCodeApi: any;
 
 export async function main() {
-  const mod = await import("@vscode/webview-ui-toolkit");
-  const { provideVSCodeDesignSystem, allComponents } = mod as any;
-  provideVSCodeDesignSystem().register(allComponents);
-
   enableMapSet();
 
   const body = document.getElementById(BODY_ID);
@@ -32,6 +28,16 @@ export async function main() {
 
   const root = createRoot(body);
   root.render(<EclairManagerPanel />);
+
+  import_wui().catch((e) => {
+    console.error("Failed to load VSCode Webview UI Toolkit:", e);
+  });
+}
+
+export async function import_wui() {
+  const mod = await import("@vscode/webview-ui-toolkit");
+  const { provideVSCodeDesignSystem, allComponents } = mod as any;
+  provideVSCodeDesignSystem().register(allComponents);
 }
 
 function EclairManagerPanel() {
