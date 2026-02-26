@@ -330,8 +330,7 @@ export class EclairManagerPanel {
 
     // Check if server is already running
     if (this._reportServerTerminal) {
-      vscode.window.showInformationMessage("ECLAIR report server is already running.");
-      return;
+      vscode.window.showInformationMessage("ECLAIR report server is already running, restarting it...");
     }
 
     const eclairDir = await this.detectEclairDir();
