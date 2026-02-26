@@ -270,7 +270,6 @@ function build_configs(cfg: FullEclairScaConfig): EclairConfig[] {
 }
 
 export function eclairReducer(state: EclairState, action: EclairStateAction): EclairState {
-  console.log("action: ", action);
   return produce(state, draft => match(action)
     .with({ type: "reset-to-defaults" }, () => default_eclair_state())
     .with({ type: "load-sca-config" }, ({ config: cfg }) => {
