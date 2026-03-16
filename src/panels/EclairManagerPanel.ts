@@ -254,7 +254,11 @@ export class EclairManagerPanel {
       terminal.sendText(cmd);
       terminal.show();
 
-      await this.tryActivateEclairExtension("ECLAIR Report");
+      // HACK: the eclair extension will restart the report server so we need
+      // to make sure that it replaces the just-spawned server.
+      setTimeout(async () => {
+        await this.tryActivateEclairExtension("ECLAIR Report");
+      }, 5000);
 
       // Store terminal reference
       this._reportServerTerminal = terminal;
